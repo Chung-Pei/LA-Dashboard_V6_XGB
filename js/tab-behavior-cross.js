@@ -25,6 +25,20 @@ const BehaviorCrossTab = (() => {
   // 造成的症狀（已於 ETL 修正，S5 現為真正的高風險分類，非樣本不足佔位）。
   const S_NAMES       = { S1:"穩定高效", S2:"規律中效", S3:"波動中效", S4:"低頻低效", S5:"高風險" };
 
+  // [XGB-FEATURE-LABEL] Top5 預測特徵代號 → 中文語意對照。
+  // MM/MQ_ratio 定義依據：19_XGBoost雙模型整合規格書v3.3 §5（10_lsa_transition.py
+  // compute_lsa_by_lsa_type()）。M=教材類行為（影音/文字/輔助教材），Q=題庫作答行為。
+  const FEATURE_LABELS_ZH = {
+    quz_pass_rate:      { zh: "題庫通過率",       desc: "題庫測驗中答對比例達及格標準的作答次數占比" },
+    quz_cramming_ratio: { zh: "題庫集中刷題率",   desc: "作答時間集中於考前臨時抱佛腳的程度" },
+    s_cluster_encoded:  { zh: "S群序列分型代碼",  desc: "序列轉移穩定性分群（S1穩定～S5高風險）轉換後的數值編碼" },
+    MQ_ratio:           { zh: "教材→題庫轉換率",  desc: "學生完成教材類行為後，接續轉向題庫作答的比例（M→Q ÷ 教材總次數）" },
+    MM_ratio:           { zh: "教材→教材連續率",  desc: "學生完成教材類行為後，再次接續教材類行為（未轉向題庫）的比例（M→M ÷ 教材總次數）" },
+  };
+  function _featureLabel(code) {
+    return FEATURE_LABELS_ZH[code] || { zh: code, desc: "" };
+  }
+
   const COLORS = {
     R1: "#3498db", R2: "#9b59b6", R3: "#2ecc71", R4: "#e67e22", R5: "#e74c3c",
     // [BUG-S5-DEFAULT FIX] S5 原用灰色(#95a5a6)，是舊語意「序列不足＝無資料」
@@ -80,10 +94,19 @@ const BehaviorCrossTab = (() => {
       .cross-alert-badge{padding:2px 8px;border-radius:10px;font-size:0.75rem;font-weight:600}
       .cross-alert-stat{font-size:0.78rem;color:var(--text-dim,#888);margin-left:auto}`,
     xgbCard: `
+      .cross-stat-zh{font-size:0.72rem;font-weight:600;color:var(--accent,#3498db);margin-top:3px}
+      .cross-stat-desc{font-size:0.68rem;color:var(--text-dim,#888);margin-top:2px;line-height:1.4}
       .cross-feat-section{margin-top:10px}
-      .cross-feat-row{display:grid;grid-template-columns:140px 1fr 56px;align-items:center;
-                       gap:8px;margin-bottom:6px;font-size:0.78rem}
-      .cross-feat-name{color:var(--text,#eee);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      .cross-feat-header{display:grid;grid-template-columns:150px 1fr 64px;gap:8px;
+                          font-size:0.68rem;color:var(--text-dim,#888);
+                          padding-bottom:4px;margin-bottom:6px;
+                          border-bottom:1px solid var(--border2,#2a2f45)}
+      .cross-feat-header-val{text-align:right}
+      .cross-feat-row{display:grid;grid-template-columns:150px 1fr 64px;align-items:center;
+                       gap:8px;margin-bottom:8px;font-size:0.78rem}
+      .cross-feat-name-wrap{overflow:hidden}
+      .cross-feat-name{color:var(--text,#eee);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+      .cross-feat-code{font-size:0.66rem;color:var(--text-dim,#777);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
       .cross-feat-bar{height:8px;border-radius:4px;background:var(--surface2,#1c2030);overflow:hidden}
       .cross-feat-bar-fill{height:100%;width:var(--w,0%);background:var(--accent2,#9b59b6);border-radius:4px}
       .cross-feat-val{color:var(--text-dim,#888);text-align:right;font-variant-numeric:tabular-nums}`,
@@ -419,9 +442,13 @@ const BehaviorCrossTab = (() => {
     const maxImp = top5.length ? Math.max(...top5.map(f => f.importance || 0)) : 0;
     const featRows = top5.map(f => {
       const pct = maxImp > 0 ? Math.round(((f.importance || 0) / maxImp) * 100) : 0;
+      const lbl = _featureLabel(f.feature);
       return `
         <div class="cross-feat-row">
-          <div class="cross-feat-name">${_safeText(f.feature)}</div>
+          <div class="cross-feat-name-wrap">
+            <div class="cross-feat-name">${_safeText(lbl.zh)}</div>
+            <div class="cross-feat-code">${_safeText(f.feature)}</div>
+          </div>
           <div class="cross-feat-bar"><div class="cross-feat-bar-fill" style="--w:${pct}%"></div></div>
           <div class="cross-feat-val">${(f.importance ?? 0).toFixed(4)}</div>
         </div>`;
@@ -433,25 +460,38 @@ const BehaviorCrossTab = (() => {
           <div class="cross-stat-box">
             <div class="cross-stat-label">AUC</div>
             <div class="cross-stat-value">${(xv.auc ?? 0).toFixed(3)}</div>
+            <div class="cross-stat-zh">模型區辨力</div>
+            <div class="cross-stat-desc">分辨「不及格／及格」學生的能力，越接近1越準</div>
             <div class="cross-stat-sub">Week ${_safeText(xv.week_limit ?? 12)} 截斷特徵</div>
           </div>
           <div class="cross-stat-box">
             <div class="cross-stat-label">Precision</div>
             <div class="cross-stat-value">${(xv.precision ?? 0).toFixed(3)}</div>
+            <div class="cross-stat-zh">命中率</div>
+            <div class="cross-stat-desc">預警為高風險的學生中，實際不及格的比例</div>
           </div>
           <div class="cross-stat-box">
             <div class="cross-stat-label">Recall</div>
             <div class="cross-stat-value">${(xv.recall ?? 0).toFixed(3)}</div>
+            <div class="cross-stat-zh">召回率</div>
+            <div class="cross-stat-desc">實際不及格學生中，被模型成功抓出的比例</div>
           </div>
           <div class="cross-stat-box">
             <div class="cross-stat-label">F1 / Accuracy</div>
             <div class="cross-stat-value cross-stat-value--sm">${(xv.f1 ?? 0).toFixed(3)} / ${(xv.accuracy ?? 0).toFixed(3)}</div>
+            <div class="cross-stat-zh">綜合分數 / 整體準確率</div>
+            <div class="cross-stat-desc">F1平衡命中率與召回率；準確率為整體預測正確比例</div>
           </div>
         </div>
         ${partialNote}
         ${top5.length ? `
           <div class="cross-feat-section">
             <div class="cross-card-title">Top 5 預測特徵（XGBoost feature importance）</div>
+            <div class="cross-feat-header">
+              <div>行為特徵</div>
+              <div>相對重要性</div>
+              <div class="cross-feat-header-val">重要性分數</div>
+            </div>
             ${featRows}
           </div>` : ""}
       </div>`;
