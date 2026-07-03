@@ -467,9 +467,9 @@ const AtRiskReportManager = (() => {
     const _pct = (v) => (typeof v === 'number' && !isNaN(v)) ? `約 ${(v * 100).toFixed(0)}%` : '無歷史參考值';
 
     let body =
-      `🔎 「提前預警」依111(1)–114(1)等已有期末成績學期建立的複合行為評分（BAS）` +
-      `與題庫精熟指數（QMI）門檻，對 ${_warningSemester} 學期 ${m.total_students} 名學生` +
-      `於期中考後進行分級預測（${m.data_cutoff ?? ''}）。\n\n` +
+      `🔎 「提前預警」依111(1)–114(1)等已有期末成績學期建立 BAS/QMI 規則，` +
+      `並納入 XGBoost 機率取較高風險層級，對 ${_warningSemester} 學期 ${m.total_students} 名學生` +
+      `於期中考後進行雙軌分級預測（${m.data_cutoff ?? ''}）。\n\n` +
       `📊 高風險：${s.HIGH.count} 人（同等級歷史不及格率${_pct(s.HIGH.historical_fail_rate_ref)}）。\n` +
       `📊 中度風險：${s.MEDIUM.count} 人（${_pct(s.MEDIUM.historical_fail_rate_ref)}）。\n` +
       `📊 低風險：${s.LOW.count} 人（${_pct(s.LOW.historical_fail_rate_ref)}）。\n\n` +

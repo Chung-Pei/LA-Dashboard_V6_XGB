@@ -735,6 +735,10 @@ function normalizeData() {
   }
   DATA.class_summary = newCS;
 
+  if (!Array.isArray(DATA.meta.incomplete_grade_semesters)) {
+    DATA.meta.incomplete_grade_semesters = inferIncompleteGradeSemestersFromClassSummary(DATA.class_summary);
+  }
+
   if (DATA.students) {
     for (const stu of Object.values(DATA.students)) {
       if (stu.records) {
@@ -742,6 +746,37 @@ function normalizeData() {
       }
     }
   }
+}
+
+function inferIncompleteGradeSemestersFromClassSummary(classSummary) {
+  const bySem = {};
+  Object.values(classSummary || {}).forEach(c => {
+    if (!c || c.type !== 'theory' || !c.semester) return;
+    const sem = String(c.semester);
+    if (!bySem[sem]) bySem[sem] = [];
+    bySem[sem].push(c);
+  });
+
+  return Object.entries(bySem).filter(([, rows]) => {
+    if (!rows.length) return false;
+    const lowPlaceholderRows = rows.filter(c =>
+      Number(c.count || 0) >= 10 &&
+      c.pass_rate === 0 &&
+      c.fail_rate === 1 &&
+      c.avg_final != null && Number(c.avg_final) <= 10 &&
+      c.avg_semester != null && Number(c.avg_semester) <= 10
+    );
+    return lowPlaceholderRows.length / rows.length >= 0.5;
+  }).map(([sem]) => sem).sort();
+}
+
+function getIncompleteGradeSemesters() {
+  return new Set((DATA?.meta?.incomplete_grade_semesters || []).map(String));
+}
+
+function getDComparableSemesters() {
+  const incomplete = getIncompleteGradeSemesters();
+  return (DATA?.meta?.semesters || []).filter(s => !incomplete.has(String(s)));
 }
 
 async function loadData() {
@@ -3262,7 +3297,7 @@ function _buildPanelSummary(panel) {
     if (progEl?.value && progEl.value !== 'all') parts.push(PROGRAM_LABELS[progEl.value] || progEl.value);
     if (typeEl?.value && typeEl.value !== 'all') parts.push(typeEl.value === 'theory' ? '正課' : '實驗課');
     if (panel === 'D' && dSemMode === 'range') {
-      const sems = DATA?.meta?.semesters || [];
+      const sems = getDComparableSemesters();
       if (sems.length) parts.unshift(`${semLabel(sems[dSemRange[0]])}–${semLabel(sems[dSemRange[1]])}`);
     }
   } else if (panel === 'C') {
@@ -3288,8 +3323,19 @@ function updateFilterSummary(panel) {
 // ══════════════════════════════════════════════════════════
 function initDSemFilter() {
   if (!DATA) return;
-  const sems = DATA.meta.semesters;
+  const sems = getDComparableSemesters();
   const maxIdx = sems.length - 1;
+  if (maxIdx < 0) {
+    dSemRange = [0, 0];
+    dSemSelected.clear();
+    document.getElementById('dSemStart').max = 0;
+    document.getElementById('dSemEnd').max = 0;
+    document.getElementById('dSemStart').value = 0;
+    document.getElementById('dSemEnd').value = 0;
+    document.getElementById('dSemMultiWrap').innerHTML = '';
+    _updateDSemRangeLabel();
+    return;
+  }
 
   document.getElementById('dSemStart').max = maxIdx;
   document.getElementById('dSemEnd').max   = maxIdx;
@@ -3316,7 +3362,7 @@ function setDSemMode(mode) {
   document.getElementById('dSemMultiCount').style.setProperty('display', mode === 'multi' ? 'inline' : 'none');
 
   if (mode === 'multi' && dSemSelected.size === 0 && DATA) {
-    const sems = DATA.meta.semesters;
+    const sems = getDComparableSemesters();
     sems.slice(-3).forEach(s => dSemSelected.add(s));
     _syncCapsuleStyles();
   }
@@ -3365,7 +3411,7 @@ function toggleDSemCapsule(btn) {
 
 function getDSemList() {
   if (!DATA) return [];
-  const sems = DATA.meta.semesters;
+  const sems = getDComparableSemesters();
   if (dSemMode === 'range') {
     return sems.slice(dSemRange[0], dSemRange[1] + 1);
   }
@@ -3374,8 +3420,13 @@ function getDSemList() {
 
 function _updateDSemRangeLabel() {
   if (!DATA) return;
-  const sems = DATA.meta.semesters;
+  const sems = getDComparableSemesters();
   const [si, ei] = dSemRange;
+  if (!sems.length) {
+    document.getElementById('dSemRangeLabel').textContent = '無可比較學期';
+    document.getElementById('dSemRangeCount').textContent = '0 個學期';
+    return;
+  }
   const count = ei - si + 1;
   document.getElementById('dSemRangeLabel').textContent =
     `${semLabel(sems[si])} – ${semLabel(sems[ei])}`;

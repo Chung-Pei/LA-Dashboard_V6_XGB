@@ -117,6 +117,10 @@ const BehaviorWarningTab = (() => {
       : `${(Number(value) * 100).toFixed(1)}%`;
   }
 
+  function _studentRiskLevel(student) {
+    return student?.risk_level_final || student?.risk_level || "LOW";
+  }
+
   async function _fetchJson(url) {
     const sep = url.includes("?") ? "&" : "?";
     const res = await fetch(`${url}${sep}v=${Date.now()}`);
@@ -348,7 +352,7 @@ const BehaviorWarningTab = (() => {
       const levelCounts = { HIGH: { fail: 0, total: 0 }, MEDIUM: { fail: 0, total: 0 }, LOW: { fail: 0, total: 0 } };
       let totalFail = 0, warnedFail = 0;
       students.forEach(s => {
-        const lvl = s.risk_level;
+        const lvl = _studentRiskLevel(s);
         if (s.actual_outcome === "FAIL") {
           totalFail++;
           if (lvl === "HIGH" || lvl === "MEDIUM") warnedFail++;
@@ -525,7 +529,7 @@ const BehaviorWarningTab = (() => {
 
     let students = _warningData.students || [];
     if (_activeFilter !== "ALL") {
-      students = students.filter((student) => student.risk_level === _activeFilter);
+      students = students.filter((student) => _studentRiskLevel(student) === _activeFilter);
     }
 
     if (students.length === 0) {
@@ -535,7 +539,8 @@ const BehaviorWarningTab = (() => {
 
     const hasValidation = "validation_date" in (_warningData.meta || {});
     const rows = students.map((student) => {
-      const meta = LEVEL_META[student.risk_level] || { label: student.risk_level || "--", color: "#888", bg: "rgba(150,150,150,.12)" };
+      const combinedLevel = _studentRiskLevel(student);
+      const meta = LEVEL_META[combinedLevel] || { label: combinedLevel || "--", color: "#888", bg: "rgba(150,150,150,.12)" };
       const rules = (student.triggered_rules || [])
         .map((rule) => `<span class="warning-rule-badge">${_safeText(rule)}</span>`)
         .join("");
@@ -551,12 +556,14 @@ const BehaviorWarningTab = (() => {
         <tr data-wrow-color="${meta.color}">
           <td>${_safeText(student.masked_id)}</td>
           <td><span class="warning-level-pill" data-wpill-bg="${meta.bg}" data-wpill-color="${meta.color}">${meta.label}</span></td>
+          <td>${_safeText(student.risk_source || "--")}</td>
           <td>${_safeText(student.r_cluster)}</td>
           <td>${student.s_cluster == null ? '<span class="warning-stat-sub">未分類</span>' : _safeText(student.s_cluster)}</td>
           <td>${_safeText(APPROACH_NAMES[student.learning_approach] || student.learning_approach || "--")}</td>
           <td>${student.midterm_score != null ? Number(student.midterm_score).toFixed(1) : "--"}${student.midterm_status === "FAIL" ? ' <span class="ladash-fail-text">(不及格)</span>' : ""}</td>
           <td>${student.qmi != null ? Number(student.qmi).toFixed(3) : "--"}</td>
           <td>${student.bas_score != null ? student.bas_score.toFixed(4) : "-"}</td>
+          <td>${_safeText(student.risk_level_bas || student.risk_level || "--")}</td>
           <td>${student.xgb_probability != null ? _pct(student.xgb_probability) : '<span style="color:var(--text-dim,#888)">模型未產出</span>'}</td>
           <td>${student.risk_level_xgb != null ? _safeText(student.risk_level_xgb) : '<span style="color:var(--text-dim,#888)">模型未產出</span>'}</td>
           <td>${rules}</td>
@@ -569,8 +576,8 @@ const BehaviorWarningTab = (() => {
         <table class="warning-table">
           <thead>
             <tr>
-              <th>學生</th><th>風險</th><th>R 群</th><th>S 群</th>
-              <th>學習取向</th><th>期中</th><th>QMI</th><th>BAS</th>
+              <th>學生</th><th>風險</th><th>來源</th><th>R 群</th><th>S 群</th>
+              <th>學習取向</th><th>期中</th><th>QMI</th><th>BAS</th><th>BAS風險</th>
               <th>XGB機率</th><th>XGB風險</th><th>觸發規則</th>
               ${hasValidation ? "<th>期末</th><th>結果</th>" : ""}
             </tr>
@@ -616,12 +623,12 @@ const BehaviorWarningTab = (() => {
   function _exportCsv() {
     let students = _warningData.students || [];
     if (_activeFilter !== "ALL") {
-      students = students.filter((student) => student.risk_level === _activeFilter);
+      students = students.filter((student) => _studentRiskLevel(student) === _activeFilter);
     }
 
     const hasValidation = "validation_date" in (_warningData.meta || {});
     const headers = [
-      "masked_id", "risk_level", "r_cluster", "s_cluster",
+      "masked_id", "risk_level", "risk_level_final", "risk_level_bas", "risk_source", "r_cluster", "s_cluster",
       "learning_approach", "midterm_score", "midterm_status",
       "qmi", "bas_score", "xgb_probability", "risk_level_xgb", "triggered_rules",
       ...(hasValidation ? ["actual_final_score", "actual_outcome"] : []),
@@ -631,7 +638,10 @@ const BehaviorWarningTab = (() => {
     students.forEach((student) => {
       const row = [
         student.masked_id,
-        student.risk_level,
+        _studentRiskLevel(student),
+        student.risk_level_final ?? "",
+        student.risk_level_bas ?? "",
+        student.risk_source ?? "",
         student.r_cluster,
         student.s_cluster,
         student.learning_approach,
