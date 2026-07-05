@@ -42,6 +42,8 @@ const BehaviorWarningTab = (() => {
     .warning-table td{padding:5px 8px;border-bottom:1px solid var(--border2,#2a2f45);white-space:nowrap}
     .warning-level-pill{padding:1px 8px;border-radius:10px;font-size:.72rem;font-weight:600}
     .warning-rule-badge{display:inline-block;padding:1px 6px;margin:1px;border-radius:4px;background:rgba(150,150,150,.15);font-size:.68rem;color:var(--text-dim,#888)}
+    .warning-rule-badge--disagree{background:rgba(230,126,34,.22);color:#e67e22;font-weight:700;border:1px solid rgba(230,126,34,.55)}
+    tr[data-wrow-disagree="true"]{background:rgba(230,126,34,.06)}
     .ladash-fail-text{color:#e74c3c}
     .ladash-outcome-fail{color:#e74c3c;font-weight:600}
     .ladash-outcome-pass{color:#2ecc71}
@@ -541,8 +543,13 @@ const BehaviorWarningTab = (() => {
     const rows = students.map((student) => {
       const combinedLevel = _studentRiskLevel(student);
       const meta = LEVEL_META[combinedLevel] || { label: combinedLevel || "--", color: "#888", bg: "rgba(150,150,150,.12)" };
+      const isDisagree = student.model_disagreement === true;
+      const pillLabel = isDisagree ? `${meta.label} ⚠待複核` : meta.label;
       const rules = (student.triggered_rules || [])
-        .map((rule) => `<span class="warning-rule-badge">${_safeText(rule)}</span>`)
+        .map((rule) => {
+          const cls = rule === "W-MODEL-DISAGREE" ? "warning-rule-badge warning-rule-badge--disagree" : "warning-rule-badge";
+          return `<span class="${cls}">${_safeText(rule)}</span>`;
+        })
         .join("");
 
       const finalScoreCell = hasValidation
@@ -553,9 +560,9 @@ const BehaviorWarningTab = (() => {
         : "";
 
       return `
-        <tr data-wrow-color="${meta.color}">
+        <tr data-wrow-color="${meta.color}" data-wrow-disagree="${isDisagree}">
           <td>${_safeText(student.masked_id)}</td>
-          <td><span class="warning-level-pill" data-wpill-bg="${meta.bg}" data-wpill-color="${meta.color}">${meta.label}</span></td>
+          <td><span class="warning-level-pill" data-wpill-bg="${meta.bg}" data-wpill-color="${meta.color}">${pillLabel}</span></td>
           <td>${_safeText(student.risk_source || "--")}</td>
           <td>${_safeText(student.r_cluster)}</td>
           <td>${student.s_cluster == null ? '<span class="warning-stat-sub">未分類</span>' : _safeText(student.s_cluster)}</td>
@@ -628,7 +635,8 @@ const BehaviorWarningTab = (() => {
 
     const hasValidation = "validation_date" in (_warningData.meta || {});
     const headers = [
-      "masked_id", "risk_level", "risk_level_final", "risk_level_bas", "risk_source", "r_cluster", "s_cluster",
+      "masked_id", "risk_level", "risk_level_final", "risk_level_bas", "risk_source", "model_disagreement",
+      "r_cluster", "s_cluster",
       "learning_approach", "midterm_score", "midterm_status",
       "qmi", "bas_score", "xgb_probability", "risk_level_xgb", "triggered_rules",
       ...(hasValidation ? ["actual_final_score", "actual_outcome"] : []),
@@ -642,6 +650,7 @@ const BehaviorWarningTab = (() => {
         student.risk_level_final ?? "",
         student.risk_level_bas ?? "",
         student.risk_source ?? "",
+        student.model_disagreement === true ? "TRUE" : "FALSE",
         student.r_cluster,
         student.s_cluster,
         student.learning_approach,
