@@ -9,7 +9,7 @@
 
 const CACHE_PREFIX = 'la-dash-v11-docs-cachefix';
 const DATA_CACHE_PREFIX = 'la-dash-v11-docs-cachefix-data';
-const BUILD_VERSION = '202607051816';
+const BUILD_VERSION = '202607111618';
 
 const CACHE_VERSION = `${CACHE_PREFIX}-${BUILD_VERSION}`;
 const DATA_CACHE = `${DATA_CACHE_PREFIX}-${BUILD_VERSION}`;
@@ -27,21 +27,21 @@ const APP_SHELL = [
   './js/vendor/chart.umd.min.js',
   './js/vendor/chartjs-plugin-annotation.min.js',
   './js/frame-guard.js',
-  './js/filter-engine.js?v=202607051816',
-  './js/main.js?v=202607051816',
+  './js/filter-engine.js?v=202607111618',
+  './js/main.js?v=202607111618',
   './js/vendor/d3.min.js',
-  './js/chart-registry.js?v=202607051816',
-  './js/help-modal.js?v=202607051816',
-  './js/behavior-loader.js?v=202607051816',
-  './js/tab-behavior-radar.js?v=202607051816',
-  './js/tab-behavior-correlation.js?v=202607051816',
-  './js/tab-behavior-time.js?v=202607051816',
-  './js/tab-behavior-lsa.js?v=202607051816',
-  './js/tab-behavior-cross.js?v=202607051816',
-  './js/tab-behavior-warning.js?v=202607051816',
-  './js/behavior-init.js?v=202607051816',
-  './js/at-risk-report.js?v=202607051816',
-  './js/print-panel.js?v=202607051816',
+  './js/chart-registry.js?v=202607111618',
+  './js/help-modal.js?v=202607111618',
+  './js/behavior-loader.js?v=202607111618',
+  './js/tab-behavior-radar.js?v=202607111618',
+  './js/tab-behavior-correlation.js?v=202607111618',
+  './js/tab-behavior-time.js?v=202607111618',
+  './js/tab-behavior-lsa.js?v=202607111618',
+  './js/tab-behavior-cross.js?v=202607111618',
+  './js/tab-behavior-warning.js?v=202607111618',
+  './js/behavior-init.js?v=202607111618',
+  './js/at-risk-report.js?v=202607111618',
+  './js/print-panel.js?v=202607111618',
 ];
 
 self.addEventListener('install', (event) => {
