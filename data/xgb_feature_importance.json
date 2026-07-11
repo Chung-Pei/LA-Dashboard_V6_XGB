@@ -1,105 +1,105 @@
 {
   "features": [
     {
-      "feature": "quz_pass_rate",
-      "importance": 0.0955,
+      "feature": "MQ_ratio",
+      "importance": 0.1069,
       "rank": 1
     },
     {
-      "feature": "s_cluster_encoded",
-      "importance": 0.0787,
+      "feature": "quz_pass_rate",
+      "importance": 0.0998,
       "rank": 2
     },
     {
-      "feature": "MQ_ratio",
-      "importance": 0.075,
+      "feature": "s_cluster_encoded",
+      "importance": 0.0896,
       "rank": 3
     },
     {
-      "feature": "quz_cramming_ratio",
-      "importance": 0.0713,
+      "feature": "vid_completion_rate",
+      "importance": 0.0503,
       "rank": 4
     },
     {
-      "feature": "MM_ratio",
-      "importance": 0.0678,
+      "feature": "quz_total_attempts",
+      "importance": 0.0486,
       "rank": 5
     },
     {
-      "feature": "cram_pattern_score",
-      "importance": 0.0475,
+      "feature": "late_night_ratio",
+      "importance": 0.0467,
       "rank": 6
     },
     {
-      "feature": "early_start_ratio",
-      "importance": 0.0455,
+      "feature": "quz_first_attempt_accuracy",
+      "importance": 0.0452,
       "rank": 7
     },
     {
-      "feature": "quz_first_attempt_accuracy",
-      "importance": 0.0441,
+      "feature": "sup_completion_rate",
+      "importance": 0.0444,
       "rank": 8
     },
     {
-      "feature": "vid_completion_rate",
-      "importance": 0.0415,
+      "feature": "aud_completion_rate",
+      "importance": 0.0411,
       "rank": 9
     },
     {
-      "feature": "quz_total_attempts",
-      "importance": 0.0406,
+      "feature": "txt_completion_rate",
+      "importance": 0.0387,
       "rank": 10
     },
     {
-      "feature": "aud_completion_rate",
-      "importance": 0.0405,
+      "feature": "quz_cramming_ratio",
+      "importance": 0.0384,
       "rank": 11
     },
     {
-      "feature": "weekly_minutes_std",
-      "importance": 0.0376,
+      "feature": "tut_total_minutes",
+      "importance": 0.0367,
       "rank": 12
-    },
-    {
-      "feature": "txt_completion_rate",
-      "importance": 0.0372,
-      "rank": 13
-    },
-    {
-      "feature": "late_night_ratio",
-      "importance": 0.0371,
-      "rank": 14
     },
     {
       "feature": "quz_score_delta",
       "importance": 0.0366,
-      "rank": 15
+      "rank": 13
     },
     {
       "feature": "consistency_score",
       "importance": 0.0365,
+      "rank": 14
+    },
+    {
+      "feature": "cram_pattern_score",
+      "importance": 0.036,
+      "rank": 15
+    },
+    {
+      "feature": "quz_final_accuracy",
+      "importance": 0.0356,
       "rank": 16
     },
     {
       "feature": "active_weeks",
-      "importance": 0.0342,
+      "importance": 0.0356,
       "rank": 17
     },
     {
-      "feature": "total_learning_minutes",
-      "importance": 0.0339,
+      "feature": "weekly_minutes_std",
+      "importance": 0.0354,
       "rank": 18
     },
     {
-      "feature": "quz_final_accuracy",
-      "importance": 0.0339,
+      "feature": "MM_ratio",
+      "importance": 0.0341,
       "rank": 19
     },
     {
-      "feature": "sup_completion_rate",
-      "importance": 0.0336,
+      "feature": "total_learning_minutes",
+      "importance": 0.0323,
       "rank": 20
     }
   ],
-  "generated_at": "2026-07-05T18:14:11"
+  "generated_at": "2026-07-11T16:16:26"
 }
