@@ -5,11 +5,13 @@
 //   - 帶 ?v= 的 JS / vendor / icons：Cache First
 //   - data/*.json 與 data/*.json.gz：Network First + 離線資料快取
 // 更新：2026-06-17 docs4 新版模組與 warning/cross 資料支援
+// 更新：2026-07-11 UI-FIX-1/3/4（課程名稱徽章 fallback、XGBoost 特徵中文譯名補齊、
+//        學習行為分頁學期篩選器排序統一由近到遠）
 // ==========================================================
 
 const CACHE_PREFIX = 'la-dash-v11-docs-cachefix';
 const DATA_CACHE_PREFIX = 'la-dash-v11-docs-cachefix-data';
-const BUILD_VERSION = '202607111726';
+const BUILD_VERSION = '202607111600';
 
 const CACHE_VERSION = `${CACHE_PREFIX}-${BUILD_VERSION}`;
 const DATA_CACHE = `${DATA_CACHE_PREFIX}-${BUILD_VERSION}`;
@@ -27,21 +29,21 @@ const APP_SHELL = [
   './js/vendor/chart.umd.min.js',
   './js/vendor/chartjs-plugin-annotation.min.js',
   './js/frame-guard.js',
-  './js/filter-engine.js?v=202607111726',
-  './js/main.js?v=202607111726',
+  './js/filter-engine.js?v=202607111600',
+  './js/main.js?v=202607111600',
   './js/vendor/d3.min.js',
-  './js/chart-registry.js?v=202607111726',
-  './js/help-modal.js?v=202607111726',
-  './js/behavior-loader.js?v=202607111726',
-  './js/tab-behavior-radar.js?v=202607111726',
-  './js/tab-behavior-correlation.js?v=202607111726',
-  './js/tab-behavior-time.js?v=202607111726',
-  './js/tab-behavior-lsa.js?v=202607111726',
-  './js/tab-behavior-cross.js?v=202607111726',
-  './js/tab-behavior-warning.js?v=202607111726',
-  './js/behavior-init.js?v=202607111726',
-  './js/at-risk-report.js?v=202607111726',
-  './js/print-panel.js?v=202607111726',
+  './js/chart-registry.js?v=202607111600',
+  './js/help-modal.js?v=202607111600',
+  './js/behavior-loader.js?v=202607111600',
+  './js/tab-behavior-radar.js?v=202607111600',
+  './js/tab-behavior-correlation.js?v=202607111600',
+  './js/tab-behavior-time.js?v=202607111600',
+  './js/tab-behavior-lsa.js?v=202607111600',
+  './js/tab-behavior-cross.js?v=202607111600',
+  './js/tab-behavior-warning.js?v=202607111600',
+  './js/behavior-init.js?v=202607111600',
+  './js/at-risk-report.js?v=202607111600',
+  './js/print-panel.js?v=202607111600',
 ];
 
 self.addEventListener('install', (event) => {
