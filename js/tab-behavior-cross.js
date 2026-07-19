@@ -46,6 +46,8 @@ const BehaviorCrossTab = (() => {
     consistency_score:          { zh: "學習穩定性",       desc: "各週學習投入時間的分布穩定程度，數值越高代表學習節奏越規律" },
     quz_score_delta:            { zh: "答題進步率",       desc: "首次作答與最終作答正確率之間的成長幅度（MG Rate）" },
     total_learning_minutes:     { zh: "總學習時間",       desc: "學期內所有教材與題庫累計學習分鐘數" },
+    reading_inflation_ratio:    { zh: "閱讀時數灌水倍數", desc: "原始累積閱讀時數 ÷ 教材離群值裁切後時數，越高代表時數中疑似有較多非真實閱讀（如掛自動播放）的成分" },
+    policy_gaming_flag:         { zh: "累積時數達標存疑", desc: "原始時數達到課程規定門檻，但排除疑似異常時段後其實未達標" },
     sup_completion_rate:        { zh: "補充筆記完成率",   desc: "補充筆記／整理資源完成度達完成門檻的比例" },
     early_start_ratio:          { zh: "提早學習比例",     desc: "在教材開放後儘早開始學習（而非拖延）的行為比例" },
     cram_pattern_score:         { zh: "臨陣磨槍指數",     desc: "學習行為集中於考前臨時衝刺、平時投入偏低的程度" },
@@ -148,16 +150,6 @@ const BehaviorCrossTab = (() => {
         background:repeating-linear-gradient(45deg,rgba(150,150,150,0.25),rgba(150,150,150,0.25) 3px,
                    transparent 3px,transparent 6px);
         border:1px dashed rgba(150,150,150,0.4)}`,
-    scopeNote: `
-      .cross-scope-summary{
-        display:flex;align-items:center;gap:6px;padding:9px 12px;
-        font-size:0.82rem;font-weight:600;cursor:pointer;list-style:none;user-select:none;
-        color:var(--text-dim,#aaa);transition:color .15s}
-      .cross-scope-summary::-webkit-details-marker{display:none}
-      .cross-scope-summary:hover{color:var(--text,#eee)}
-      .cross-scope-arrow{
-        font-size:0.65rem;display:inline-block;transition:transform .2s;
-        color:var(--accent,#3498db)}`,
     legend: `
       .cross-legend-card{
         margin:12px 0;border-radius:8px;overflow:hidden;
@@ -203,11 +195,6 @@ const BehaviorCrossTab = (() => {
     // _severityTextColorClass below).
     shared: `
       ${_PALETTE_CSS}
-      .cross-scope-card{border-radius:8px;overflow:hidden;
-        border:1px solid rgba(100,160,255,0.22);background:rgba(100,160,255,0.06)}
-      .cross-scope-detail{padding:10px 14px 12px;font-size:0.82rem;line-height:1.7;
-        border-top:1px solid rgba(100,160,255,0.15);color:var(--text,#eee)}
-      .cross-scope-arrow.is-open{transform:rotate(90deg)}
       .cross-card-body{font-size:0.82rem;line-height:1.7}
       .cross-card-title{margin-bottom:8px;font-weight:600}
       .cross-box-info{margin-bottom:8px;padding:8px 10px;border-radius:6px;
@@ -319,40 +306,32 @@ const BehaviorCrossTab = (() => {
          驗證日期 ${_safeText(wv.date)}，HIGH 風險組校準誤差 ${_safeText(wv.highErrorPp)}pp`
       : "";
 
-    // B2 FIX: 先注入 CSS，確保首次開關時 transition 已生效
-    _injectStyleOnce("__cross-style-scope", _STYLES.scopeNote);
-
-    // B1 FIX: wasOpen 首次渲染時 querySelector 返回 null → ?.hasAttribute() = undefined
-    // undefined !== false 為 true，導致永遠強制 open，無法讀取「前次收折狀態」。
-    // 正確語意：若存在舊 <details> 則沿用其 .open 屬性；否則預設 open（初次展開）。
-    const prevDetails = el.querySelector('details');
-    const openAttr = (prevDetails === null || prevDetails.open) ? ' open' : '';
+    // UNIFY-C：改用與「相關性分析」分頁 corrInfoToggleBtn 一致的按鈕＋div 摺疊樣式
+    // （原生 <details> 改為統一格式），並將預設狀態改為關閉。
+    // 沿用「記住上次展開/收合狀態」邏輯：若先前已渲染過且使用者展開過，重繪後維持展開；
+    // 否則（含首次渲染）預設關閉。
+    const prevBody = el.querySelector('#crossScopeBody');
+    const wasOpen = prevBody ? prevBody.style.display !== 'none' : false;
 
     el.innerHTML = `
-      <details${openAttr} class="cross-scope-card">
-        <summary class="cross-scope-summary">
-          <span class="cross-scope-arrow">▶</span>
-          ℹ️ 資料範圍說明
-        </summary>
-        <div class="cross-scope-detail">
+      <div style="border-radius:5px;background:rgba(100,160,255,0.07);border:1px solid rgba(100,160,255,0.2);overflow:hidden">
+        <button type="button" id="crossScopeToggleBtn"
+          style="width:100%;text-align:left;padding:7px 10px;background:none;border:none;cursor:pointer;
+                 font-size:0.78rem;color:var(--text-dim,#888);display:flex;align-items:center;gap:6px">
+          <span id="crossScopeIcon" style="font-size:10px;color:var(--accent,#4f8ef7)">${wasOpen ? '▼' : '▶'}</span>
+          ℹ️ <strong style="color:var(--text,#dde3f5)">資料範圍說明</strong>
+          <span style="font-size:10px;opacity:0.6;margin-left:auto">點擊展開</span>
+        </button>
+        <div id="crossScopeBody" style="display:${wasOpen ? 'block' : 'none'};padding:0 10px 10px 10px;font-size:0.78rem;color:var(--text-dim,#888);line-height:1.7">
           本分析僅納入正課（theory）學生，實習科目（practicum）採30分制計分且60%成績未記入學習系統，已完全排除。
           訓練集為已有期末成績之學期（n=${_safeText(meta.n_with_final ?? '—')}）；
           ${semNote}，
           可於「🔮 提前預警」分頁單獨查看其預警名單。${validationNote}
         </div>
-      </details>
+      </div>
     `;
-    // rotate arrow on open/close（每次重繪後重新綁定，舊 DOM 已被 innerHTML 清除，無洩漏）
-    // CSP FIX: was `arr.style.transform = ...` (direct style mutation,
-    // governed by style-src same as an inline style attribute). Replaced
-    // with classList toggling against `.cross-scope-arrow.is-open`.
-    const det = el.querySelector('details');
-    const arr = el.querySelector('.cross-scope-arrow');
-    if (det && arr) {
-      const _syncArrow = () => { arr.classList.toggle('is-open', det.open); };
-      _syncArrow();
-      det.addEventListener('toggle', _syncArrow);
-    }
+    // 摺疊開關本身由 help-modal.js 內統一的 delegated click listener 處理
+    // （比照 corrInfoToggleBtn，見該檔 §「摺疊卡片統一 toggle 邏輯」）。
   }
 
   function resetFilters() {

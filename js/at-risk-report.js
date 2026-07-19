@@ -206,7 +206,7 @@ const AtRiskReportManager = (() => {
       renderCohortSummary(semData.cohort_summary);
       renderRadarChart(semData.metrics_comparison);
       renderTemporalChart(semData.temporal_decay);
-      renderRedFlags(semData.behavioral_markers, semData.temporal_decay);
+      renderRedFlags(semData.behavioral_markers, semData.temporal_decay, semData.reading_integrity);
       renderPrescriptions(semData.prescriptive_summary);
       renderTopRiskFactors(_featureImportance);
     } catch (e) {
@@ -498,7 +498,7 @@ const AtRiskReportManager = (() => {
     };
   }
 
-  function renderRedFlags(bm, td) {
+  function renderRedFlags(bm, td, ri) {
     const el = document.getElementById('rRedFlags');
     if (!el) return;
     const flags = [];
@@ -546,6 +546,29 @@ const AtRiskReportManager = (() => {
         icon: '🔴', title: `學習中斷警示：不及格組平均連續停擺 ${failMed} 週（及格組僅 ${passMed} 週）`,
         body, color: '#e67e22', multiline: true,
       });
+    }
+
+    // ── 新增：閱讀誠信度 ──
+    if (ri?.fail_group && ri?.pass_group) {
+      const failPct = (ri.fail_group.flagged_pct * 100).toFixed(0);
+      const passPct = (ri.pass_group.flagged_pct * 100).toFixed(0);
+      const failRatio = ri.fail_group.avg_inflation_ratio.toFixed(1);
+      const passRatio = ri.pass_group.avg_inflation_ratio.toFixed(1);
+      // 只在盛行率不算低時才顯示（避免資料太乾淨時還硬跳出一張空泛的卡片）
+      if (ri.fail_group.n_flagged + ri.pass_group.n_flagged > 0) {
+        const body =
+          `🔎 「累積時數達標存疑」是指：原始累積閱讀時數看似達到課程規定門檻，但排除` +
+          `疑似異常時段（如放置自動播放）後，實際時數其實未達標。\n\n` +
+          `📊 不及格組：${failPct}% 的學生被標記（平均灌水倍數 ${failRatio}倍）。\n\n` +
+          `📊 及格組：${passPct}% 的學生被標記（平均灌水倍數 ${passRatio}倍）。\n\n` +
+          `💡 提醒：這是客觀數據，不代表被標記的學生一定有意圖操弄系統（例如少數` +
+          `輔助工具使用者單次時長可能異常偏長），建議搭配其他指標人工複核，而非` +
+          `單獨作為處分依據。`;
+        flags.push({
+          icon: '📖', title: `累積時數達標存疑：不及格組 ${failPct}%、及格組 ${passPct}% 被標記`,
+          body, color: '#16a085', multiline: true,
+        });
+      }
     }
 
     const decayFail = td?.available ? td.post_midterm_decay_rate?.fail_group_median_pct : null;
@@ -994,7 +1017,7 @@ const AtRiskReportManager = (() => {
         renderCohortSummary(_currentSemData.cohort_summary);
         renderRadarChart(_currentSemData.metrics_comparison);
         renderTemporalChart(_currentSemData.temporal_decay);
-        renderRedFlags(_currentSemData.behavioral_markers, _currentSemData.temporal_decay);
+        renderRedFlags(_currentSemData.behavioral_markers, _currentSemData.temporal_decay, _currentSemData.reading_integrity);
         renderPrescriptions(_currentSemData.prescriptive_summary);
         renderTopRiskFactors(_featureImportance);
 
@@ -1003,7 +1026,7 @@ const AtRiskReportManager = (() => {
         renderCohortSummary(_data.cohort_summary);
         renderRadarChart(_data.metrics_comparison);
         renderTemporalChart(_data.temporal_decay);
-        renderRedFlags(_data.behavioral_markers, _data.temporal_decay);
+        renderRedFlags(_data.behavioral_markers, _data.temporal_decay, _data.reading_integrity);
         renderPrescriptions(_data.prescriptive_summary);
         renderTopRiskFactors(_featureImportance);
       }

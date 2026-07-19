@@ -84,27 +84,27 @@ const BehaviorCorrelationTab = (() => {
       border:  "1px solid rgba(120,130,160,0.35)",
       txtCls:  "text-muted",
     },
+    // BUG-CORR-2 FIX：原本這裡另外定義了 excluded_new_material（symbol「新教材」），
+    // 是獨立於 scale_change 的第二個 reason key。但兩者代表的是同一件事──
+    // 某指標在特定學期的規模變動過大，暫時排除於全體(all/all/all)計算──
+    // 只是 ETL 內部依觸發成因用了兩種字串（既有教材規模驟變 vs 新教材大量
+    // 導入），且這兩種 reason 字串在 lagged_pearson／pearson 兩處分別出現過。
+    // 拆成兩個 REASON_CONFIG key 會讓 Object.values(REASON_CONFIG) 產生的
+    // 圖例重複兩條意思相同的說明、也讓使用者誤以為是兩種不同狀況。
+    // 移除獨立的 excluded_new_material 定義，改在下面查表時把它正規化成
+    // scale_change 讀同一份設定，兩種 reason 字串共用同一個符號／說明。
     scale_change: {
       symbol:  "Δ規模",
       label:   "本學期規模性變動，暫排除全體計算",
-      detail:  "此指標本學期數值規模較歷史顯著變動（非新增教材），為避免學期間規模差異扭曲全體相關係數，暫排除於全量(all/all/all)計算{nHint}。切換至單一學期或分群可看到實際 r 值。",
-      color:   "rgba(80,160,255,0.15)",
-      border:  "1px solid rgba(80,160,255,0.45)",
-      txtCls:  "text-info",
-    },
-    // BUG-CORR-1 FIX: ETL 早已會輸出 reason="excluded_new_material"（見上方註解與
-    // correlation_matrix.json 實際資料），但 REASON_CONFIG 從未定義對應項目，
-    // 導致 REASON_CONFIG[reason] 查不到值，一律 fallback 顯示成 no_etl 的「∅ ETL 無此欄位」，
-    // 誤導使用者以為 ETL 沒算這個欄位；實際上 ETL 有算，只是因故排除於全量(all/all/all)計算。
-    excluded_new_material: {
-      symbol:  "新教材",
-      label:   "新增教材，全量計算暫排除",
-      detail:  "此教材類別在部分學期尚未提供或用量規模差異過大，跨學期合併(全量 all/all/all)計算會被無資料的學期拉低而失真，故暫排除{nHint}。切換至單一學期或分群可看到該學期實際 r 值。",
+      detail:  "此指標在特定學期的數值規模較歷史顯著變動（無論是既有教材用量驟變、或新教材大量導入），為避免學期間規模差異扭曲全體相關係數，暫排除於全量(all/all/all)計算{nHint}。切換至單一學期或分群可看到該學期實際 r 值。",
       color:   "rgba(80,160,255,0.15)",
       border:  "1px solid rgba(80,160,255,0.45)",
       txtCls:  "text-info",
     },
   };
+
+  // excluded_new_material 與 scale_change 共用同一份 REASON_CONFIG 設定（見上方註解）
+  const REASON_ALIAS = { excluded_new_material: "scale_change" };
 
   let _corrData     = null;
 
@@ -392,6 +392,7 @@ const BehaviorCorrelationTab = (() => {
       ]);
 
       _corrData = corrRaw;
+      _renderCorrExclusionNote();
 
       // 若 ETL 資料不完整（無 scatter 或無欄位）直接提示，不再前端重建
       if (!_hasUsableCorrelation(_corrData)) {
@@ -450,6 +451,52 @@ const BehaviorCorrelationTab = (() => {
     } finally {
       BehaviorLoader.setLoading("tab-correlation", false);
     }
+  }
+
+  // ── BUGFIX-C（0716 穿透式審查）：全體相關性計算說明卡片內容改為動態讀取
+  //    correlation_matrix.json 的 meta.excluded_material_detail，取代先前寫死在
+  //    index.html 的「AUD(114-2新增+35件)、VID(114-2新增+30件)」文字。
+  //    此為 ETL CHANGELOG_v7.md §v7.10 交接事項：「前端後續可以改成動態讀取
+  //    這個欄位組字串，取代 help-modal.js 第524行的寫死文案」，本輪落地實作。
+  //    新資料（docs_0716）額外新增 total_learning_minutes 一項（閱讀誠信度
+  //    清理方法調整導致的排除，current_delta 為 null，與 AUD/VID 的「新教材
+  //    規模變動」是不同性質的排除原因，故分開判斷措辭，但仍在同一份清單內
+  //    統一呈現，而非拆成兩張卡片。
+  function _renderCorrExclusionNote() {
+    const body = document.getElementById("corrInfoBody");
+    if (!body) return;
+
+    const CATEGORY_LABELS = { AUD: "AUD", VID: "VID", total_learning_minutes: "總學習時間" };
+    const details = Array.isArray(_corrData?.meta?.excluded_material_detail)
+      ? _corrData.meta.excluded_material_detail
+      : [];
+
+    const introHTML =
+      "系統自動偵測各教材類別的跨學期新增量是否出現規模性變動" +
+      "（條件：當期增量 &gt; 歷史最大單期增量 × 2 倍，且絕對新增件數 ≥ 10 件），" +
+      "或該指標計算方法於本學期調整。觸發條件的類別特徵將從「全體」Pearson 計算中排除，" +
+      "以避免新教材大量導入或計算方法變動造成舊學期資料偏低的比較偏差。<br>";
+
+    if (!details.length) {
+      body.innerHTML = introHTML + "目前排除類別：<strong>無</strong>。";
+      return;
+    }
+
+    const items = details.map(d => {
+      const label = CATEGORY_LABELS[d.category] || String(d.category ?? "");
+      const sem = _formatSemLabel(d.current_semester);
+      if (d.current_delta !== null && d.current_delta !== undefined) {
+        // AUD/VID 類：新教材規模變動，delta 為新增件數
+        return `<strong>${label}</strong>（${sem} 新增 +${d.current_delta} 件）`;
+      }
+      // total_learning_minutes 類：非新增件數變動，而是計算方法（閱讀誠信度裁切）調整
+      return `<strong>${label}</strong>（${sem} 起改採閱讀誠信度裁切後淨值計算，計算方法變動）`;
+    });
+
+    body.innerHTML =
+      introHTML +
+      `目前排除類別：${items.join("、")}。<br>` +
+      "各學期<strong>單獨</strong>選擇時不受影響，仍可正常顯示相關係數。";
   }
 
   // ── 篩選列 ───────────────────────────────────────────────
@@ -1007,13 +1054,52 @@ const BehaviorCorrelationTab = (() => {
     const segKey  = _segKey();
     const segData = _canUseSeg() ? (_corrData?.segment_pearson?.[segKey] ?? null) : null;
 
+    /**
+     * BUG-CORR-3：排除 Δ規模 觸發學期後，其餘學期並非「無法計算」，
+     * 應該還是能合理算出相關性──只是不能把觸發規模變動的那個學期也
+     * 一起併入全量計算。這裡在「全量」模式下，對被排除的欄位嘗試用
+     * 「扣掉觸發學期後的其餘學期」重新計算一次真實 r 值，取代直接顯示
+     * Δ規模 診斷符號。
+     *
+     * 需要 ETL 在 correlation_matrix.json 的 meta 裡提供
+     * `excluded_material_detail`（見交接文件 v3 第4節已設計、尚未套用的
+     * compute_material_outlier_cats(return_detail=True) 擴充）：
+     *   meta.excluded_material_detail = [
+     *     { category, feature_cols: [...], current_semester, ... }, ...
+     *   ]
+     * 在 ETL 補上這個欄位之前，這裡會直接回傳 null，維持現行「顯示
+     * Δ規模」的行為不受影響、不會壞；ETL 補上後前端不需要再改一次，
+     * 會自動切換成顯示重算後的真實數值。
+     */
+    function _recomputeExcludingTrigger(feat, g) {
+      const detailList = _corrData?.meta?.excluded_material_detail;
+      if (!Array.isArray(detailList) || !Array.isArray(_allScatterData)) return null;
+      const entry = detailList.find(d =>
+        Array.isArray(d?.feature_cols) && d.feature_cols.includes(feat) && d.current_semester
+      );
+      if (!entry) return null;
+      const excludeSem = String(entry.current_semester);
+      const rows = _allScatterData.filter(row => String(row?.semester) !== excludeSem);
+      if (!rows.length) return null;
+      const result = isSpearman ? _spearmanValue(rows, feat, g) : _pearsonValue(rows, feat, g);
+      if (result?.r == null) return null;
+      return { r: result.r, recomputed: true, excludedSemester: excludeSem, n: rows.length };
+    }
+
     function _getR(feat, g) {
       if (isUnfiltered) {
         // 全量：讀 ETL 預算值（含 reason，如 excluded_new_material）
         const raw = _corrData?.pearson?.[feat]?.[g] ?? _corrData?.pearson?.[g]?.[feat] ?? null;
         if (raw !== null && typeof raw === "object") {
           const r = raw.r ?? null;
-          if (r == null) return { r: null, reason: raw.reason ?? "no_etl", n: raw.n ?? null };
+          if (r == null) {
+            const reason = raw.reason ?? "no_etl";
+            if (reason === "excluded_new_material" || reason === "scale_change") {
+              const recomputed = _recomputeExcludingTrigger(feat, g);
+              if (recomputed) return recomputed;
+            }
+            return { r: null, reason, n: raw.n ?? null };
+          }
           return { r };
         }
         const r = _pearson(feat, g);
@@ -1056,7 +1142,7 @@ const BehaviorCorrelationTab = (() => {
         if (r == null) {
           const reason = result?.reason ?? "no_etl";
           const nHint  = (result?.n != null) ? `（有效樣本 ${result.n} 筆）` : "";
-          const cfg    = REASON_CONFIG[reason] ?? REASON_CONFIG.no_etl;
+          const cfg    = REASON_CONFIG[REASON_ALIAS[reason] ?? reason] ?? REASON_CONFIG.no_etl;
           const detail = cfg.detail.replace("{nHint}", nHint);
           const featLabel  = escapeHtml(FEAT_LABELS[feat] || feat);
           const gradeLabel = escapeHtml(GRADE_LABELS[g] || g);
@@ -1066,6 +1152,24 @@ const BehaviorCorrelationTab = (() => {
                       data-corr-bg="${cfg.color}" data-corr-bd="${cfg.border}"
                       title="${escapeHtml(tipText)}">
                     <span class="ladash-corr-err-sym">${cfg.symbol}</span>
+                  </td>`;
+        }
+
+        // ── 全量模式下，Δ規模 觸發學期已排除、以其餘學期重算出的真實值 ──
+        if (result?.recomputed) {
+          const rr         = result.r;
+          const bg2        = _rToColor(rr);
+          const textColor2 = Math.abs(rr) > 0.55 ? "#fff" : "var(--text,#dde3f5)";
+          const featLabel  = escapeHtml(FEAT_LABELS[feat] || feat);
+          const gradeLabel = escapeHtml(GRADE_LABELS[g] || g);
+          const tip = `${featLabel} vs ${gradeLabel}：${corrSym}=${rr >= 0 ? "+" : ""}${rr.toFixed(3)}`
+                    + `（已排除 ${result.excludedSemester}，以其餘學期共 ${result.n} 筆資料重新計算；`
+                    + `${result.excludedSemester} 本身仍可切換至單一學期檢視）`;
+          return `<td class="text-center small ladash-corr-cell ladash-c-ptr"
+                      data-corr-feat="${escapeHtml(feat)}" data-corr-target="${escapeHtml(g)}"
+                      data-corr-bg="${bg2}" data-corr-tc="${textColor2}"
+                      title="${escapeHtml(tip)}">
+                    ${corrSym}${rr >= 0 ? "+" : ""}${rr.toFixed(2)}<sup class="ladash-sig-sup">†</sup>
                   </td>`;
         }
 
@@ -1146,6 +1250,11 @@ const BehaviorCorrelationTab = (() => {
           ${cfg.label}
         </span>`).join("")}
         <span class="ladash-c-op7">（滑鼠移至儲存格可查看詳細說明）</span>
+        ${Array.isArray(_corrData?.meta?.excluded_material_detail) ? `
+        <span class="ladash-c-iflex4">
+          <span class="ladash-reason-swatch text-info" data-rsw-bg="rgba(80,160,255,0.15)" data-rsw-bd="1px solid rgba(80,160,255,0.45)">†</span>
+          已排除規模性變動學期，以其餘學期重新計算
+        </span>` : ""}
       </div>`;
     // CSP-CORR FIX: apply computed colors via DOM API
     el.querySelectorAll(".ladash-corr-cell[data-corr-bg]").forEach(cell => {

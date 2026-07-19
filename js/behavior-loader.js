@@ -28,7 +28,10 @@ const BehaviorLoader = (() => {
                                  // 5+ 個分頁即觸發淘汰，導致切回先看過的分頁需重新 fetch，
                                  // 與此快取機制設計目的（避免重複 fetch）相違背。
   const _lruCache = new Map();  // 保證插入順序（ES2015+）
-  const DATA_VERSION = "202607161349"; // [Schema 3.1] by_lsa_type 修正 and cache-busting update
+  // Must match sw.js BUILD_VERSION and index.html's JS ?v= parameter.
+  // A new value makes every JSON request a new URL, so an older Service
+  // Worker or browser HTTP cache cannot return a prior ETL result.
+  const DATA_VERSION = "202607190952";
 
   // ── 同時請求去重（避免多個 Tab 並發初始化時重複 fetch）─────
   // 例：sub-warning 與 Tab R 的 lazyInit 可能在同一時刻

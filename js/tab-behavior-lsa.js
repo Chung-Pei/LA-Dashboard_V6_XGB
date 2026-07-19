@@ -50,7 +50,44 @@ const BehaviorLsaTab = (() => {
     .ladash-lsa-warn-hdr{font-weight:600;color:#e67e22;margin-bottom:4px}
     .ladash-lsa-mono-box{background:var(--surface2,#1c2030);border:1px solid var(--border2,#2a2f45);border-radius:8px;padding:12px 14px;font-family:monospace;font-size:.82rem;color:var(--text,#dde3f5);margin-bottom:14px}
     .ladash-lsa-mono-lh{line-height:2}
-    .ladash-lsa-interpret-body{max-height:0;overflow:hidden;transition:max-height .25s ease,margin-top .25s ease}`; // CSP-V6: initial closed state + CSS transition
+    .ladash-lsa-interpret-body{max-height:0;overflow:hidden;transition:max-height .25s ease,margin-top .25s ease}
+    .ladash-cc-wrap{display:flex;flex-direction:row;align-items:stretch;overflow-x:auto;padding:4px 2px 8px}
+    .behavior-cluster-card{border-radius:8px;box-shadow:0 2px 8px rgba(20,35,60,.06)}
+    .ladash-cc-total{border:1px solid rgba(46,204,113,.28);background:rgba(46,204,113,.08)}
+    .ladash-cc-lbl{color:var(--text-dim,#888)}
+    .ladash-cc-total-num{margin-top:4px;font-weight:800;color:var(--green,#239b56);line-height:1}
+    .ladash-cc-pct{margin-top:6px;line-height:1.25;color:var(--text-mid,#9aa0b8)}
+    .ladash-cc-item{cursor:pointer}
+    .ladash-cc-row{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+    .ladash-cc-key{font-weight:700;font-family:'JetBrains Mono','Courier New',monospace}
+    .ladash-cc-count{font-weight:700;line-height:1}
+    .ladash-cc-name{margin-top:6px;line-height:1.25;color:var(--text-mid,#4f5f78);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .ladash-cc-pct2{margin-top:3px;line-height:1.2;color:var(--text-dim,#888)}
+    .ladash-ins-panel{border:1px solid var(--border,#2a2f45);border-radius:10px;background:var(--surface,#13161f);margin-bottom:14px}
+    .ladash-ins-title{font-size:.82rem;font-weight:700;color:var(--text,#dde3f5);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+    .ladash-ins-dot{display:inline-block;width:8px;height:8px;border-radius:50%}
+    .ladash-ins-section{margin-bottom:10px}
+    .ladash-ins-hdr{font-size:.78rem;font-weight:700;margin-bottom:6px;letter-spacing:.04em}
+    .ladash-ins-hdr-str{color:var(--green,#64d4a8)}
+    .ladash-ins-hdr-gap{color:var(--red,#f07070)}
+    .ladash-ins-hdr-rec{color:var(--accent3,#f7a44f)}
+    .ladash-ins-row{display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap}
+    .ladash-ins-dim{font-family:'JetBrains Mono','Courier New',monospace;font-size:.78rem;font-weight:700;min-width:36px}
+    .ladash-ins-lbl{font-size:.78rem;color:var(--text-mid,#9aa0b8);flex:1;min-width:80px}
+    .ladash-ins-vals{display:flex;gap:4px;align-items:center}
+    .ladash-ins-bench{font-size:.76rem;color:var(--text-dim,#888)}
+    .ladash-ins-val-str{font-size:.82rem;font-weight:700;color:var(--green,#64d4a8)}
+    .ladash-ins-val-gap{font-size:.82rem;font-weight:700;color:var(--red,#f07070)}
+    .ladash-ins-diff-str{font-size:.76rem;color:var(--green,#64d4a8);background:rgba(100,212,168,.12);border-radius:6px;padding:1px 5px}
+    .ladash-ins-diff-gap{font-size:.76rem;color:var(--red,#f07070);background:rgba(240,112,112,.12);border-radius:6px;padding:1px 5px}
+    .ladash-ins-summary{font-size:.80rem;color:var(--text-mid,#9aa0b8);line-height:1.6;background:var(--surface2,#1c2030);border-radius:0 8px 8px 0;padding:8px 12px;margin-bottom:10px}
+    .ladash-ins-rec-row{display:flex;gap:8px;align-items:flex-start;margin-bottom:6px}
+    .ladash-ins-rec-icon{font-size:1rem;line-height:1.4}
+    .ladash-ins-rec-txt{font-size:.80rem;color:var(--text-mid,#9aa0b8);line-height:1.5}
+    .ladash-ins-fallback{font-size:.74rem;color:var(--accent3,#f7a44f);margin-bottom:8px;padding:4px 8px;background:rgba(247,164,79,.08);border-radius:6px}
+    .ladash-ins-export-wrap{margin-top:4px}
+    .ladash-ins-export-btn{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:20px;background:transparent;font-size:.78rem;font-weight:600;cursor:pointer;font-family:inherit;transition:background .15s}
+    .ladash-ins-export-cnt{font-size:.72rem;color:var(--text-dim,#888);margin-left:8px}`; // CSP-V6: initial closed state + CSS transition
     const sentinel = document.createElement("meta");
     sentinel.id = _LSA_STYLE_ID;
     if (typeof CSSStyleSheet !== "undefined" && CSSStyleSheet.prototype.replaceSync) {
@@ -72,6 +109,7 @@ const BehaviorLsaTab = (() => {
   })();
 
   let _lsaData        = null;
+  let _behaviorStudents = [];   // A-2：匯出用學生名單（含 masked_id/cluster），與資源使用雷達圖分頁共用同一份 behavior.json
   let _group          = "all";
   let _filterSemester = "all";
   let _filterCluster  = "all";   // by_cluster（R 資源分群切片，R→S 換牌）
@@ -81,8 +119,38 @@ const BehaviorLsaTab = (() => {
   const BEHAVIOR_LABELS = { M: "教材閱讀", Q: "題庫作答" };
   // CLUSTER_NAMES：by_cluster dropdown，key 對應 ETL by_cluster 的 R1–R5
   const CLUSTER_NAMES  = { R1:"影音輔導型", R2:"彈性聽覺型", R3:"平均使用型", R4:"題庫刷題型", R5:"被動低參與型" };
+  // CLUSTER_COLORS：A-1 資訊卡片／A-2 洞察卡片配色，比照資源使用雷達圖分頁 tab-behavior-radar.js 同名常數
+  const CLUSTER_COLORS = {
+    R1:{border:"rgba(52,152,219,0.9)",bg:"rgba(52,152,219,0.15)"},
+    R2:{border:"rgba(46,204,113,0.9)",bg:"rgba(46,204,113,0.15)"},
+    R3:{border:"rgba(155,89,182,0.9)",bg:"rgba(155,89,182,0.15)"},
+    R4:{border:"rgba(230,126,34,0.9)",bg:"rgba(230,126,34,0.15)"},
+    R5:{border:"rgba(189,195,199,0.9)",bg:"rgba(189,195,199,0.15)"},
+  };
   // LSA_TYPE_NAMES：by_lsa_type dropdown，key 對應 ETL by_lsa_type 的 S1–S5
   const LSA_TYPE_NAMES = { S1:"穩定高效", S2:"規律中效", S3:"波動中效", S4:"低頻低效", S5:"高風險" };
+  // BUGFIX-A（0716 穿透式審查）：A-1/A-2 卡片與洞察面板的分析主體應為「行為序列分群」
+  // （S1–S5，本頁「序列轉移」的分析對象），先前誤用「資源使用分型」（R1–R5，那是
+  // 資源使用雷達圖分頁的分析對象）。LSA_TYPE_COLORS 配色獨立於 CLUSTER_COLORS（R系）。
+  const LSA_TYPE_COLORS = {
+    S1:{border:"rgba(46,204,113,0.9)", bg:"rgba(46,204,113,0.15)"},   // 穩定高效 → 綠
+    S2:{border:"rgba(52,152,219,0.9)", bg:"rgba(52,152,219,0.15)"},   // 規律中效 → 藍
+    S3:{border:"rgba(241,196,15,0.9)", bg:"rgba(241,196,15,0.15)"},   // 波動中效 → 黃
+    S4:{border:"rgba(230,126,34,0.9)", bg:"rgba(230,126,34,0.15)"},   // 低頻低效 → 橙
+    S5:{border:"rgba(231,76,60,0.9)",  bg:"rgba(231,76,60,0.15)"},    // 高風險   → 紅
+  };
+  // A-2：洞察比對用門檻與建議文案（比照 tab-behavior-radar.js 的 INSIGHT_THRESHOLD / RECOMMENDATION_MAP，
+  // 改用「連續性比率」而非六維完成率——理由見 _lsaRatios() 註記）
+  const LSA_MIN_PASS_COUNT    = 10;    // 及格群樣本數低於此值時標示為 fallback（見 _getLsaPassBenchmark）
+  const LSA_INSIGHT_THRESHOLD = 0.03;  // 差距 ≥ 3 個百分點才列入洞察
+  const LSA_DIM_LABELS = {
+    mPersist: "教材閱讀連續性（M→M）",
+    qPersist: "題庫作答連續性（Q→Q）",
+  };
+  const LSA_RECOMMENDATION_MAP = {
+    mPersist: { action:"建議引導本群學生延長單次教材閱讀時間，避免頻繁中斷切換，強化深度理解。", icon:"📖" },
+    qPersist: { action:"建議鼓勵本群學生以連續刷題方式累積練習量，強化輸出記憶與熟練度。", icon:"📋" },
+  };
   const NODE_BASE_R  = 40;   // 32 × 1.25
   const NODE_SCALE   = 0.008;
   const EDGE_Z_SCALE = 0.55;
@@ -123,8 +191,12 @@ const BehaviorLsaTab = (() => {
       if (typeof d3 === "undefined") {
         throw new Error("D3.js 載入失敗，請確認網路連線後重新整理。");
       }
-      const corrData = await BehaviorLoader.load.correlation();
-      const lsaRaw   = corrData?.lsa_transition;
+      const [corrData, behaviorData] = await Promise.all([
+        BehaviorLoader.load.correlation(),
+        BehaviorLoader.load.behavior().catch(() => null),
+      ]);
+      const lsaRaw = corrData?.lsa_transition;
+      _behaviorStudents = behaviorData?.students || [];
 
       if (!lsaRaw || !lsaRaw.groups) {
         _renderEmpty("ETL 尚未產出 LSA 資料，請重新執行 lms_etl.py 後重整頁面。");
@@ -134,6 +206,7 @@ const BehaviorLsaTab = (() => {
       _lsaData = lsaRaw;
       _renderFilterBar();
       _render();
+      _renderLsaInsights();
 
       const wrap = document.getElementById("lsaGraphWrap");
       if (wrap && typeof ResizeObserver !== "undefined") {
@@ -314,6 +387,7 @@ const BehaviorLsaTab = (() => {
         ${hasCluster ? _sel("lsaClusterFilter", clusterOptions, "資源分群", "120px", clusterLocked) : ""}
         ${hasLsaType ? _sel("lsaTypeFilter",    lsaTypeOptions, "序列分群", "120px", false)         : ""}
       </div>
+      <div id="lsaClusterSummaryCards"></div>
       <div id="lsaInfoBar" class="ladash-lsa-infobar"></div>`;
 
         anchor.querySelectorAll("[data-locked='1']").forEach(function(el) {
@@ -330,6 +404,358 @@ const BehaviorLsaTab = (() => {
       ?.addEventListener("change", _onFilterChange);
     document.getElementById("lsaTypeFilter")
       ?.addEventListener("change", _onFilterChange);
+
+    // A-1：行為序列分群資訊卡片，僅在 by_lsa_type 有資料時渲染
+    if (hasLsaType) _renderSeqTypeCards("lsaClusterSummaryCards");
+  }
+
+  // ── A-1：行為序列分群資訊卡片（比照資源使用雷達圖分頁 renderClusterSummary，
+  //         改用本頁的分析主體 S1–S5／by_lsa_type）──
+  function _renderSeqTypeCards(containerId) {
+    const el = document.getElementById(containerId);
+    if (!el || !_lsaData?.by_lsa_type) return;
+
+    // 固定跑 S1–S5 五個 key（而非 Object.keys 動態取得），確保像 S5 這種目前
+    // n_sequences=0（無資料）的分群仍顯示「0 人」卡片，而不是靜默消失、
+    // 讓使用者誤以為卡片沒有載入成功。
+    const typeKeys = Object.keys(LSA_TYPE_NAMES);
+
+    // 分母採 by_lsa_type 各分群人數加總，理由同 R 版：groups.all 排除「尚無期末
+    // 成績」驗證學期學生，但 by_lsa_type 分群不受此限，兩者分母口徑不同。
+    const total = typeKeys.reduce(
+      (sum, k) => sum + (_lsaData.by_lsa_type[k]?.all?.n_students || 0), 0
+    );
+
+    const isMobile = window.innerWidth < 600;
+    const cardW  = isMobile ? "110px" : "150px";
+    const cardW2 = isMobile ? "104px" : "144px";
+    const pad    = isMobile ? "7px 9px" : "10px 12px";
+    const numSz  = isMobile ? "1.15rem" : "1.45rem";
+    const lblSz  = isMobile ? ".72rem"  : ".78rem";
+    const nameSz = isMobile ? ".76rem"  : ".82rem";
+    const pcSz   = isMobile ? ".70rem"  : ".76rem";
+    const keySz  = isMobile ? ".84rem"  : ".92rem";
+
+    const totalCard = `<div class="behavior-cluster-card ladash-cc-total"
+      data-cw="${cardW}" data-pad="${pad}" data-lsz="${lblSz}" data-nsz="${numSz}">
+      <div class="ladash-cc-lbl">分析人數</div>
+      <div class="ladash-cc-total-num">${total.toLocaleString()}</div>
+      <div class="ladash-cc-pct">100.0%</div>
+    </div>`;
+
+    const cards = typeKeys.map(key => {
+      const row  = _lsaData.by_lsa_type[key]?.all;
+      const n    = row?.n_students || 0;
+      const pct  = total ? (n / total) * 100 : 0;
+      const col  = LSA_TYPE_COLORS[key] || LSA_TYPE_COLORS.S1;
+      const name = LSA_TYPE_NAMES[key] || key;
+      const isSelected = _filterLsaType === key;
+      const emptyNote = n === 0 ? `<div class="ladash-cc-pct2" style="opacity:.7">目前無資料</div>` : "";
+      return `<div class="behavior-cluster-card ladash-cc-item${isSelected ? " ladash-cc-sel" : ""}"
+        data-seqtype-card="${key}"
+        data-cw="${cardW2}" data-pad="${pad}" data-ksz="${keySz}" data-nsz="${numSz}"
+        data-nmsz="${nameSz}" data-pcsz="${pcSz}"
+        data-col-border="${col.border}" data-col-bg="${col.bg}" data-is-sel="${isSelected ? 1 : 0}">
+        <div class="ladash-cc-row">
+          <span class="ladash-cc-key" data-clr="${col.border}">${key}</span>
+          <span class="ladash-cc-count" data-clr="${col.border}">${n}</span>
+        </div>
+        <div class="ladash-cc-name" title="${name}">${name}</div>
+        ${n > 0 ? `<div class="ladash-cc-pct2">佔 ${pct.toFixed(1)}%</div>` : emptyNote}
+      </div>`;
+    }).join("");
+
+    el.innerHTML = `<div class="ladash-cc-wrap" data-gap="${isMobile ? '6px' : '10px'}">${totalCard}${cards}</div>`;
+
+    const ccWrap = el.querySelector(".ladash-cc-wrap");
+    if (ccWrap) ccWrap.style.setProperty("gap", ccWrap.dataset.gap || "8px");
+    el.querySelectorAll(".ladash-cc-total[data-cw]").forEach(c => {
+      c.style.setProperty("flex", `0 0 ${c.dataset.cw || "auto"}`);
+      c.style.setProperty("min-width", c.dataset.cw || "auto");
+      c.style.setProperty("padding", c.dataset.pad || "8px");
+      const lbl = c.querySelector(".ladash-cc-lbl");
+      const num = c.querySelector(".ladash-cc-total-num");
+      const pct = c.querySelector(".ladash-cc-pct");
+      if (lbl) lbl.style.setProperty("font-size", c.dataset.lsz || ".78rem");
+      if (num) num.style.setProperty("font-size", c.dataset.nsz || "1rem");
+      if (pct) pct.style.setProperty("font-size", c.dataset.lsz || ".78rem");
+    });
+    el.querySelectorAll(".ladash-cc-item[data-cw]").forEach(c => {
+      c.style.setProperty("flex", `0 0 ${c.dataset.cw}`);
+      c.style.setProperty("min-width", c.dataset.cw);
+      c.style.setProperty("padding", c.dataset.pad);
+      const isSel = c.dataset.isSel === "1";
+      c.style.setProperty("border", isSel ? `2px solid ${c.dataset.colBorder || "var(--accent)"}` : "1px solid rgba(110,130,165,.22)");
+      c.style.setProperty("background", isSel ? (c.dataset.colBg || "var(--surface2)") : "var(--surface,#13161f)");
+      c.querySelectorAll("[data-clr]").forEach(sp => { if (sp.dataset.clr) sp.style.setProperty("color", sp.dataset.clr); });
+      const key = c.querySelector(".ladash-cc-key");
+      const cnt = c.querySelector(".ladash-cc-count");
+      const nm  = c.querySelector(".ladash-cc-name");
+      const pc  = c.querySelector(".ladash-cc-pct2");
+      if (key) key.style.setProperty("font-size", c.dataset.ksz || ".78rem");
+      if (cnt) cnt.style.setProperty("font-size", c.dataset.nsz || "1rem");
+      if (nm)  nm.style.setProperty("font-size", c.dataset.nmsz || ".78rem");
+      if (pc)  pc.style.setProperty("font-size", c.dataset.pcsz || ".76rem");
+    });
+    el.querySelectorAll("[data-seqtype-card]").forEach(card => {
+      card.addEventListener("click", () => _selectSeqTypeCard(card.dataset.seqtypeCard));
+    });
+    // 總卡（分析人數）點擊＝清除序列分群篩選，回到全部序列型
+    const totalCardEl = el.querySelector(".ladash-cc-total");
+    if (totalCardEl) totalCardEl.addEventListener("click", () => _selectSeqTypeCard("all"));
+  }
+
+  // 點擊資訊卡片＝選定行為序列分群，套用與序列分群下拉選單相同的互斥規則（FIX-Q5：
+  // 選序列分群→鎖學期＋資源分群，因為 by_lsa_type 是獨立於學期/資源分群的維度）
+  function _selectSeqTypeCard(key) {
+    _filterLsaType = key === "all" ? "all" : key;
+    _filterSemester = "all";
+    _filterCluster  = "all";
+    _renderFilterBar();
+    if (_lsaData) { _render(); _renderLsaInsights(); }
+  }
+
+  // ── A-2：LSA 行為序列比率換算 ─────────────────────────────────
+  // 說明：資源使用雷達圖分頁比較的是六維「完成率」，可直接取百分比差值；
+  // 但 LSA 的 z_score 會隨樣本數（序列對數）等比放大，不同分群人數差異極大
+  // （如 R2 僅 4 人、R1 近千人），直接比較 z_score 大小沒有統計意義。
+  // 因此改用「條件轉移機率」（樣本數無關的比率）作為比較基準：
+  //   mPersist = P(下一動作仍為 M | 目前為 M) = M→M ÷ (M→M + M→Q)
+  //   qPersist = P(下一動作仍為 Q | 目前為 Q) = Q→Q ÷ (Q→Q + Q→M)
+  // 比率越高代表該分群在該行為上的「連續／專注」傾向越強。
+  function _lsaRatios(groupRow) {
+    const obs = groupRow?.observed || {};
+    const mm = Number(obs["M→M"]) || 0, mq = Number(obs["M→Q"]) || 0;
+    const qm = Number(obs["Q→M"]) || 0, qq = Number(obs["Q→Q"]) || 0;
+    const mTotal = mm + mq, qTotal = qq + qm;
+    const bt = groupRow?.behavior_totals || {};
+    const mSum = Number(bt.M) || 0, qSum = Number(bt.Q) || 0;
+    return {
+      mPersist: mTotal > 0 ? mm / mTotal : null,
+      qPersist: qTotal > 0 ? qq / qTotal : null,
+      qShare:   (mSum + qSum) > 0 ? qSum / (mSum + qSum) : null,
+      mShare:   (mSum + qSum) > 0 ? mSum / (mSum + qSum) : null,
+      count:    groupRow?.n_students ?? null,
+    };
+  }
+
+  // 及格群基準：insight 面板僅在選定資源分群時顯示，此時依 FIX-Q5 互斥規則
+  // _filterSemester 必為 "all"，故直接採用全體及格群（_lsaData.groups.pass）即可，
+  // 無需比照雷達圖再做學期範圍 fallback。
+  function _getLsaPassBenchmark() {
+    const g = _lsaData?.groups?.pass;
+    if (!g) return null;
+    const ratios = _lsaRatios(g);
+    return { ...ratios, isFallback: (g.n_students ?? 0) < LSA_MIN_PASS_COUNT };
+  }
+
+  // ── A-2：學習行為洞察（序列轉移分群）── 比照資源使用雷達圖分頁 _renderInsights() ──
+  function _renderLsaInsights() {
+    const panel = document.getElementById("lsaInsightsPanel");
+    if (!panel) return;
+
+    // 未選定行為序列分群（全部序列型／依學期／依資源分群）時不顯示，
+    // 比照雷達圖「R0 全體不顯示洞察」的邏輯
+    if (_filterLsaType === "all" || !_lsaData?.by_lsa_type?.[_filterLsaType]) {
+      panel.style.setProperty("display", "none");
+      return;
+    }
+
+    const typeRow = _lsaData.by_lsa_type[_filterLsaType].all;
+    const typeName  = LSA_TYPE_NAMES[_filterLsaType] || _filterLsaType;
+    const typeColor = LSA_TYPE_COLORS[_filterLsaType]?.border || "var(--accent)";
+
+    // BUGFIX-A：部分序列型（如目前的 S5「高風險」）可能剛好 0 位學生
+    // （n_sequences=0），過去版本會直接隱藏面板，使用者容易誤會成「卡片沒載入」。
+    // 改為明確顯示「此分群目前無資料」，而非靜默消失。
+    if (!typeRow || (typeRow.n_sequences ?? 0) === 0) {
+      panel.style.setProperty("display", "block");
+      panel.innerHTML = `
+        <div class="ladash-ins-panel">
+          <div class="ladash-ins-title">
+            <span class="ladash-ins-dot" data-clr="${typeColor}"></span>
+            學習行為洞察（行為序列分群）— ${_filterLsaType} ${typeName}
+          </div>
+          <div class="ladash-ins-summary">此分群目前無足夠序列資料可供分析（0 位學生），暫無法產生洞察。</div>
+        </div>`;
+      panel.querySelectorAll("[data-clr]").forEach(node => {
+        if (node.classList.contains("ladash-ins-dot")) node.style.setProperty("background", node.dataset.clr);
+      });
+      return;
+    }
+
+    const bench = _getLsaPassBenchmark();
+    if (!bench) { panel.style.setProperty("display", "none"); return; }
+
+    // 一律採該分群「全體（不分及格/不及格）」列，與雷達圖洞察邏輯一致
+    // （不隨畫面上的 全體/及格組/不及格組 按鈕變動，避免比較基準與比較對象混淆）
+    const row = _lsaRatios(typeRow);
+    if (row.mPersist === null && row.qPersist === null) {
+      panel.style.setProperty("display", "none");
+      return;
+    }
+
+    const clName  = typeName;
+    const clColor = typeColor;
+    const pct  = v => v === null ? "—" : `${(v * 100).toFixed(1)}%`;
+    const sign = v => v > 0 ? "+" : "";
+
+    const diffs = ["mPersist", "qPersist"]
+      .filter(dim => row[dim] !== null && bench[dim] !== null)
+      .map(dim => ({
+        dim,
+        label: LSA_DIM_LABELS[dim] || dim,
+        clVal: row[dim],
+        benchVal: bench[dim],
+        diff: row[dim] - bench[dim],
+      }));
+
+    const strengths = diffs.filter(x => x.diff >=  LSA_INSIGHT_THRESHOLD).sort((a, b) => b.diff - a.diff);
+    const gaps      = diffs.filter(x => x.diff <= -LSA_INSIGHT_THRESHOLD).sort((a, b) => a.diff - b.diff);
+
+    const strHTML = strengths.length ? `
+      <div class="ladash-ins-section">
+        <div class="ladash-ins-hdr ladash-ins-hdr-str">▲ 高於及格群基準</div>
+        ${strengths.map(x => `
+          <div class="ladash-ins-row">
+            <span class="ladash-ins-lbl">${x.label}</span>
+            <div class="ladash-ins-vals">
+              <span class="ladash-ins-bench">${pct(x.benchVal)} →</span>
+              <span class="ladash-ins-val-str">${pct(x.clVal)}</span>
+              <span class="ladash-ins-diff-str">${sign(x.diff)}${pct(x.diff)}</span>
+            </div>
+          </div>`).join("")}
+      </div>` : "";
+
+    const gapHTML = gaps.length ? `
+      <div class="ladash-ins-section">
+        <div class="ladash-ins-hdr ladash-ins-hdr-gap">▼ 低於及格群基準</div>
+        ${gaps.map(x => `
+          <div class="ladash-ins-row">
+            <span class="ladash-ins-lbl">${x.label}</span>
+            <div class="ladash-ins-vals">
+              <span class="ladash-ins-bench">${pct(x.benchVal)} →</span>
+              <span class="ladash-ins-val-gap">${pct(x.clVal)}</span>
+              <span class="ladash-ins-diff-gap">${sign(x.diff)}${pct(x.diff)}</span>
+            </div>
+          </div>`).join("")}
+      </div>` : "";
+
+    // 行為佔比為中性描述資訊，不計入強弱項評分（方向見 _lsaRatios 上方註記）
+    const shareHTML = (row.mShare !== null) ? `
+      <div class="ladash-ins-row" style="margin-top:2px">
+        <span class="ladash-ins-lbl">M/Q 行為佔比</span>
+        <div class="ladash-ins-vals">
+          <span class="ladash-ins-bench">教材 ${pct(row.mShare)}／刷題 ${pct(row.qShare)}</span>
+          <span class="ladash-ins-bench">（及格群基準：教材 ${pct(bench.mShare)}／刷題 ${pct(bench.qShare)}）</span>
+        </div>
+      </div>` : "";
+
+    const summaryParts = [];
+    if (strengths.length) {
+      const top = strengths[0];
+      summaryParts.push(`本群學生（${_filterLsaType}）在 <strong>${top.label}</strong> 高出及格群基準 <strong class="ladash-ins-val-str">${pct(Math.abs(top.diff))}</strong>`);
+    }
+    if (gaps.length) {
+      const top = gaps[0];
+      summaryParts.push(`但在 <strong>${top.label}</strong> 低於及格群基準 <strong class="ladash-ins-val-gap">${pct(Math.abs(top.diff))}</strong>`);
+    }
+    const summaryHTML = summaryParts.length ? `
+      <div class="ladash-ins-summary" data-clr="${clColor}">${summaryParts.join("，")}。</div>` : "";
+
+    const recItems = gaps.map(g => LSA_RECOMMENDATION_MAP[g.dim]).filter(Boolean);
+    const recHTML = recItems.length ? `
+      <div class="ladash-ins-section">
+        <div class="ladash-ins-hdr ladash-ins-hdr-rec">💡 建議措施</div>
+        ${recItems.map(r => `
+          <div class="ladash-ins-rec-row">
+            <span class="ladash-ins-rec-icon">${r.icon}</span>
+            <span class="ladash-ins-rec-txt">${r.action}</span>
+          </div>`).join("")}
+      </div>` : "";
+
+    const fallbackHTML = bench.isFallback ? `
+      <div class="ladash-ins-fallback">※ 及格群樣本數不足（&lt;${LSA_MIN_PASS_COUNT}人），比較結果僅供參考。</div>` : "";
+
+    // BUG-FOUND-穿透式審查（沿用0712輪發現的教訓，此輪換成 S 維度重新確認）：
+    // row.count 來自 by_lsa_type 限定樣本，但 behavior.json 的學生紀錄本身不帶
+    // S 型別欄位（只有 R 型別的 cluster 欄位），必須透過 _lsaData.lsa_type_map
+    // （key 為 `${anon_id}||${semester}`）才能還原「這位學生這學期屬於哪個 S 型別」。
+    // 匯出人數與面板「共 X 人」一律採 lsa_type_map 實際比對結果，確保兩者一致
+    // （不重蹈 0712 輪 R1 卡片「面板寫951人、實際匯出998筆」對不上的錯誤）。
+    const seqMap = _lsaData.lsa_type_map || {};
+    const matchedStudents = _behaviorStudents.filter(
+      s => seqMap[`${s.anon_id}||${s.semester}`] === _filterLsaType
+    );
+    const exportCount = matchedStudents.length;
+
+    const exportHTML = `
+      <div class="ladash-ins-export-wrap">
+        <button data-export-lsa-seqtype-csv="1" class="ladash-ins-export-btn" data-clr="${clColor}">
+          ⬇ 匯出 ${_filterLsaType} 學生名單（CSV）
+        </button>
+        <span class="ladash-ins-export-cnt">共 ${exportCount} 人</span>
+      </div>`;
+
+    panel.style.setProperty("display", "block");
+    panel.innerHTML = `
+      <div class="ladash-ins-panel">
+        <div class="ladash-ins-title">
+          <span class="ladash-ins-dot" data-clr="${clColor}"></span>
+          學習行為洞察（行為序列分群）— ${_filterLsaType} ${clName}
+        </div>
+        ${fallbackHTML}
+        ${summaryHTML}
+        ${strHTML}
+        ${gapHTML}
+        ${shareHTML}
+        ${recHTML}
+        ${exportHTML}
+      </div>`;
+
+    panel.querySelectorAll("[data-clr]").forEach(node => {
+      const clr = node.dataset.clr;
+      if (node.classList.contains("ladash-ins-dot"))     node.style.setProperty("background", clr);
+      if (node.classList.contains("ladash-ins-summary")) node.style.setProperty("border-left", `3px solid ${clr}`);
+      if (node.classList.contains("ladash-ins-export-btn")) {
+        node.style.setProperty("border", `1.5px solid ${clr}`);
+        node.style.setProperty("color", clr);
+      }
+    });
+    const insPanelEl = panel.querySelector(".ladash-ins-panel");
+    if (insPanelEl) insPanelEl.style.setProperty("padding", window.innerWidth < 600 ? "10px" : "14px");
+
+    const exportBtn = panel.querySelector("[data-export-lsa-seqtype-csv]");
+    if (exportBtn) {
+      const hoverBg = LSA_TYPE_COLORS[_filterLsaType]?.bg || "rgba(79,142,247,.15)";
+      exportBtn.addEventListener("click", () => _exportLsaSeqTypeCSV(matchedStudents));
+      exportBtn.addEventListener("mouseenter", () => exportBtn.style.setProperty("background", hoverBg));
+      exportBtn.addEventListener("mouseleave", () => exportBtn.style.setProperty("background", "transparent"));
+    }
+  }
+
+  // ── A-2：匯出行為序列分群學生名單（CSV）── 沿用資源使用雷達圖分頁同一份 behavior.json，
+  //         透過 lsa_type_map 還原每位學生的 S 型別（見上方 _renderLsaInsights 註記）──
+  function _exportLsaSeqTypeCSV(matchedStudents) {
+    if (!matchedStudents || !matchedStudents.length) { alert("目前篩選條件下無學生資料"); return; }
+    const header = ["masked_id", "seq_type", "cluster", "semester", "final_score"].join(",");
+    const rows = matchedStudents.map(s =>
+      [s.masked_id || "", _filterLsaType, s.cluster || "", s.semester || "", s.final_score ?? s.semester_score ?? ""].join(",")
+    );
+    const csv = "\uFEFF" + [header, ...rows].join("\r\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = Object.assign(document.createElement("a"), {
+      href: url,
+      download: `${_filterLsaType}_students_lsa.csv`,
+      style: "display:none",
+    });
+    document.body.appendChild(a);
+    a.click();
+    requestAnimationFrame(() => {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    });
   }
 
   function _onFilterChange() {
@@ -345,7 +771,7 @@ const BehaviorLsaTab = (() => {
     }
     // 重繪 filterBar 更新 disabled 狀態
     _renderFilterBar();
-    if (_lsaData) _render();
+    if (_lsaData) { _render(); _renderLsaInsights(); }
   }
 
   // ── 群組按鈕 ──────────────────────────────────────────────────
@@ -360,7 +786,7 @@ const BehaviorLsaTab = (() => {
   function onGroupChange(group) {
     _group = group || "all";
     _syncGroupBtnStyles();
-    if (_lsaData) _render();
+    if (_lsaData) { _render(); _renderLsaInsights(); }
   }
 
   function _syncGroupBtnStyles() {
@@ -379,7 +805,7 @@ const BehaviorLsaTab = (() => {
     _filterLsaType  = "all";
     _syncGroupBtnStyles();
     _renderFilterBar();   // re-renders dropdowns with correct disabled state & selected values
-    if (_lsaData) _render();
+    if (_lsaData) { _render(); _renderLsaInsights(); }
   }
 
   // ── 依 filter 狀態取得對應 groupData ─────────────────────────

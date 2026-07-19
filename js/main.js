@@ -832,6 +832,27 @@ function init() {
       `成績 ${rangeText} · ${studentText}人`;
   }
 
+  // BUGFIX-F（0716 穿透式審查後續）：課程名稱徽章（#subjectInput）先前只能透過
+  // BehaviorTabManager 背景預載完成後（需下載 behavior.json，18MB+）才會更新，
+  // 使用者常會先看到很久的預設文字。課程名稱在 ETL 讀取 LMS Excel 檔頭時就已
+  // 取得（見 01_load_lms_excel.py 的 _extract_course_header()），屬於固定不變
+  // 的課程屬性、不需要等整批行為資料算完。
+  // 這裡加一條「若 data.json 的 meta 已有 course_name/course_id 就直接使用」的
+  // 提早路徑——data.json 是每次進站都會載入的最小必要資料，不受任何分頁延遲
+  // 載入影響。目前的 ETL 尚未把這兩個欄位寫進 data.json（詳見交接文件
+  // HANDOFF_course_name_early_load.md），此處先做成「有就用、沒有就照舊」的
+  // 防禦式寫法：ETL 補上欄位後前端不需要再改一次就會自動切換成快速路徑，
+  // 沒補上時完全不影響現有行為（仍由 autoFillSubjectFromBehavior() 於行為
+  // 分頁背景預載完成後補上，見 main.js 下方與 behavior-init.js）。
+  if (m.course_name) {
+    const input = document.getElementById('subjectInput');
+    if (input) {
+      input.textContent = m.course_name;
+      input.dataset.filledEarly = "1";
+      updateSubjectDisplay();
+    }
+  }
+
   populateFilters();
   initDSemFilter();
   populateCFilterSem();
@@ -3081,6 +3102,11 @@ async function autoFillSubjectFromBehavior() {
   const input = document.getElementById('subjectInput');
   if (!input) return;
 
+  // BUGFIX-F（0716 穿透式審查後續）：init() 若已從 data.json 的
+  // meta.course_name 提早填好（見 main.js init() 內同編號註記），這裡就不用
+  // 再等 behavior.json（18MB+）載入完成後重覆設定一次。
+  if (input.dataset.filledEarly === "1") { updateSubjectDisplay(); return; }
+
   let courseName = null;
 
   if (!courseName && window.BEHAVIOR_SUMMARY?.course_name) {
@@ -3099,10 +3125,12 @@ async function autoFillSubjectFromBehavior() {
     } catch (_) { }
   }
 
-  // UI-FIX-1：ETL 目前輸出的 course_name 為空字串（behavior.json / at_risk_profile.json
-  // 的 meta.course_name 皆為 ""），並非前端邏輯漏接，而是資料源缺漏（根因待 ETL 端補上
-  // exam_dates.json 中的 course_name 回填）。此處加上預設文字，避免徽章永久空白；
-  // 與 print-panel.js getSubjectLabel() 的 fallback 文字保持一致。
+  // UI-FIX-1（0716 更新）：舊版 ETL 曾經 behavior.json / at_risk_profile.json
+  // 的 meta.course_name 恆為空字串（v7.8 之前），此處加上預設文字避免徽章
+  // 永久空白；與 print-panel.js getSubjectLabel() 的 fallback 文字保持一致。
+  // v7.8 起 behavior.json 已能正確帶出真實課程名稱，但仍得等該分頁背景預載
+  // 完成才看得到——這正是本輪 BUGFIX-F 要提早解決的體感延遲，故仍保留這條
+  // 路徑作為 data.json 尚未補上 course_name 欄位前的相容 fallback。
   input.textContent = courseName || '微生物免疫學成績與學習行為儀表板';
   updateSubjectDisplay();
 }

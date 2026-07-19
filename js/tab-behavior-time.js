@@ -349,14 +349,25 @@ const BehaviorTimeTab = (() => {
   // 原有圖表（完整保留）
   // ────────────────────────────────────────────────────────────
 
+  // BUGFIX-B2（0716 穿透式審查）：1121/1122/1131 為「16+2週」學制特例
+  // （期中考第8週、期末考第16週；17、18週為自學週），其餘學期為
+  // 「期中考第9週、期末考第18週」。共用於 renderWeeklyQuiz() 的週次
+  // fallback 判斷，以及下面 examLinePlugin 的紅色參考線繪製位置。
+  const SIXTEEN_PLUS_TWO_SEMS = new Set(["1121", "1122", "1131"]);
+  function _examWeeksForCurrentFilter() {
+    if (SIXTEEN_PLUS_TWO_SEMS.has(_filterSemester)) {
+      return { weeks: [8, 16], labels: { 8: "期中考", 16: "期末考" } };
+    }
+    return { weeks: [9, 18], labels: { 9: "期中考", 18: "期末考" } };
+  }
+
   const examLinePlugin = {
     id: "examVerticalLines",
     afterDraw(chart) {
       const { ctx, scales, data } = chart;
       const xScale = scales.x;
       if (!xScale) return;
-      const examWeeks = [9, 18];
-      const examLabels = { 9: "期中考", 18: "期末考" };
+      const { weeks: examWeeks, labels: examLabels } = _examWeeksForCurrentFilter();
       data.labels.forEach((label, i) => {
         const weekNum = parseInt(label.replace("W", ""), 10);
         if (!examWeeks.includes(weekNum)) return;
@@ -493,12 +504,49 @@ const BehaviorTimeTab = (() => {
 
     const rawWeeks = _weeksForFilter();
     const weekMap = new Map(rawWeeks.map(w => [Number(w.week), w]));
+
+    // BUGFIX-B2（0716 穿透式審查）：1121/1122/1131 為「16+2週」學制特例
+    // （期中考第8週、期末考第16週；17、18週為自學週），與其餘學期慣用的
+    // 「期中考第9週、期末考第18週」不同（依 ETL_fixed_v7_14_1 修正結論）。
+    // 原本不分學期一律寫死 i===9/i===18 判斷考試週，對這三個學期會誤判：
+    // 真正的期中/期末考週（8/16）被當成一般練習週顯示 active_students:0，
+    // 而真正沒有考試的週（9/18）反而被標成考試週、bar 被隱藏，輸出錯誤分析圖。
+    // 「全部年度」（_filterSemester==="all"）維持原本 9/18 判斷不變——那是
+    // 跨學期彙總後 ETL 自行決定的參考週次，不屬於本次修正範圍。
+    // （SIXTEEN_PLUS_TWO_SEMS 定義於模組頂層，與 examLinePlugin 共用同一份判斷）
+    const { weeks: _examWeeks } = _examWeeksForCurrentFilter();
+    const [midWeek, finalWeek] = _examWeeks;
+
     const weeks = [];
     for (let i = 1; i <= 18; i++) {
-      const fallback = i === 9 || i === 18
-        ? { week: i, title: `第${i}週 ${i === 9 ? "期中考" : "期末考"}`, is_exam_week: true, exam_type: i === 9 ? "midterm" : "final", active_students: 0, avg_attempts: 0, overall_pass_rate: 0 }
-        : { week: i, title: `第${i}週 練習題庫`, active_students: 0, avg_attempts: 0, overall_pass_rate: 0 };
-      weeks.push({ ...fallback, ...(weekMap.get(i) || {}) });
+      // BUG-TIME-QUIZ-6 FIX: 這裡原本給 avg_attempts 一個預設值 0。
+      // 但 _weeksForFilter() 回傳的物件在「全部年度」篩選、或特定學期缺
+      // segment 時，本來就不會有 avg_attempts 這個欄位（不是「值為
+      // undefined」，是整個 key 都不存在）。物件展開 {...a, ...b} 只有
+      // b 「真的有」某個 key 時才會覆蓋 a 的值──b 沒有這個 key，a 的
+      // 值就會原封不動留著。這裡的 0 因此永遠蓋不掉，讓
+      // _weekAvgAttempts() 裡 `w.avg_attempts != null` 提早為真直接
+      // 回傳 0，我們在該函式內做的人數加權平均／null 判斷完全跑不到，
+      // 導致「全部年度」整條線貼底、特定學期缺 segment 的週次也顯示
+      // 假的 0 而非斷點。拿掉這個預設值，讓沒有資料的週次維持
+      // undefined，才能真正落到 _weekAvgAttempts() 的判斷邏輯。
+      const fallback = i === midWeek || i === finalWeek
+        ? { week: i, title: `第${i}週 ${i === midWeek ? "期中考" : "期末考"}`, is_exam_week: true, exam_type: i === midWeek ? "midterm" : "final", active_students: 0, overall_pass_rate: 0 }
+        : { week: i, title: `第${i}週 練習題庫`, active_students: 0, overall_pass_rate: 0 };
+      const merged = { ...fallback, ...(weekMap.get(i) || {}) };
+      // BUGFIX-B2 續：weekMap.get(i) 若命中「頂層彙總週次」（sem 有篩選但該學期
+      // 剛好無 segment 時的降級路徑，見 _weeksForFilter() 內 BUG-TIME-QUIZ-5 FIX
+      // 附近的 base 分支），會帶著彙總版自己的 is_exam_week（可能是 null，如
+      // 1121 的第 8/16 週在彙總表本身也不是考試週）明確蓋掉上面 fallback 剛設
+      // 好的 true——物件展開只要來源「有這個 key」就會覆蓋，即使值是 null。
+      // 因此 is_exam_week／exam_type／title 一律以本學期正確的 midWeek/finalWeek
+      // 判斷為準，最後強制覆蓋回去，不受 weekMap 合併結果影響；其餘欄位
+      // （出席人數、作答次數、及格率）仍照常採用合併後的真實資料。
+      merged.is_exam_week = (i === midWeek || i === finalWeek);
+      merged.exam_type = i === midWeek ? "midterm" : (i === finalWeek ? "final" : null);
+      if (i === midWeek) merged.title = `第${i}週 期中考`;
+      else if (i === finalWeek) merged.title = `第${i}週 期末考`;
+      weeks.push(merged);
     }
 
     const labels = weeks.map(w => `W${w.week}`);
@@ -733,9 +781,7 @@ const BehaviorTimeTab = (() => {
     .ladash-t-bold-ns{font-weight:700;flex-shrink:0}
     .ladash-t-flex-ns{display:flex;align-items:center;gap:3px;flex-shrink:0}
     .ladash-t-grid-auto{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:8px;margin-top:10px}
-    .ladash-t-insight-box{margin-top:8px;padding:8px 10px;border-radius:6px;background:var(--card-bg2,#1c2030);font-size:.76rem;line-height:1.5}
     .ladash-t-note-xs{margin-top:5px;font-size:.73rem;color:var(--text-dim,#999)}
-    .ladash-t-chart-hdr{font-weight:700;margin-bottom:5px;font-size:.85rem}
     .ladash-t-chart-sub{font-weight:400;color:var(--text-dim,#888)}
     .ladash-t-pre{color:var(--text-mid,#9aa0b8);white-space:pre-line}
     .ladash-t-dot{cursor:default;transition:opacity .15s}
@@ -808,22 +854,22 @@ const BehaviorTimeTab = (() => {
     el.innerHTML =
       filterBadge +
       `<div class="ladash-t-grid-auto">${cardHtml}</div>` +
-      '<div class="ladash-t-insight-box">' +
-        '<b>平時及考前學習強度分型定義（規格書 V2.1）：</b><br>' +
-        '核心指標：<b>T<sub>total</sub></b>（統計期間總閱讀時數）、<b>T<sub>pre</sub></b>（考前7天累計時數）、' +
-        '<b>P<sub>pre</sub></b> = T<sub>pre</sub> ÷ T<sub>total</sub> × 100%。<br>' +
-        '判定優先順序（MECE）：' +
-        '<b>① 學習低投入型</b>：T<sub>total</sub> &lt; P15 門檻（全體最低15%），學習量不足，不分析節奏；' +
-        '<b>② 高度衝刺型</b>：P<sub>pre</sub> ≥ 30%（集中學習 Massed Practice）；' +
-        '<b>③ 規律分散型</b>：10% ≤ P<sub>pre</sub> &lt; 30%（分散學習 Distributed Practice）；' +
-        '<b>④ 提早完成型</b>：P<sub>pre</sub> &lt; 10%（前置規劃 Pre-planning）。<br>' +
-        `本次 P15 門檻：期中 ${Math.round(p15Mid)} 分鐘、期末 ${Math.round(p15Final)} 分鐘。` +
-      '</div>' +
       '<div class="ladash-t-note-xs">' +
         '外圈 = 期末考；內圈 = 期中考。若資料未含考試分段時數，以總閱讀時數與考前7天時數估算，重跑 ETL 可取得精準值。' +
       '</div>';
     // 必須在 innerHTML 寫入後才呼叫，確保 DOM 已存在再附加事件監聽
     _bindFilterSelects(card);
+
+    // TASK-B：分型定義全文已改為「?」按鈕（attachHelpButtons() 依 #preExamChart
+    // 自動掛載）點擊開啟的說明彈窗，內容見 help-modal.js 的 HELP_CONTENT.preExamChart。
+    // 此處僅需將隨篩選條件變動的 P15 門檻數值，就地更新進同一個物件參照，
+    // 讓使用者點開「?」時看到的門檻永遠是目前篩選結果的數值。
+    const p15Section = HELP_CONTENT?.preExamChart?.sections?.find(
+      s => s.type === 'metric' && s.name === '本次 P15 門檻'
+    );
+    if (p15Section) {
+      p15Section.note = `期中 ${Math.round(p15Mid)} 分鐘、期末 ${Math.round(p15Final)} 分鐘（依目前篩選條件動態計算）。`;
+    }
   }
 
   function renderTimeSlotDonut(canvasId) {
@@ -958,17 +1004,30 @@ const BehaviorTimeTab = (() => {
 與長期學習成效正相關。`;
     }
 
+    // UNIFY-C：改為與相關性分析 corrInfoToggleBtn 一致的摺疊格式、預設關閉，
+    // 收合狀態下仍保留圖示／標題／色彩（維持一眼可辨識風險等級），
+    // 展開後才顯示完整說明文字。重繪時沿用使用者上次的展開/收合狀態。
+    const prevBody = el.querySelector('#timeAiInsightBody');
+    const wasOpen = prevBody ? prevBody.style.display !== 'none' : false;
+
     el.innerHTML = `
-      <div class="ladash-t-insight-box" data-bg="${color}" data-border="${borderColor}">
-        <div class="ladash-t-chart-hdr">
-          ${icon} AI 洞察 &nbsp;<span class="ladash-t-chart-sub">${title}</span>
-        </div>
-        <div class="ladash-t-pre">${message}</div>
+      <div style="border-radius:5px;overflow:hidden" data-bg="${color}" data-border="${borderColor}">
+        <button type="button" id="timeAiInsightToggleBtn"
+          style="width:100%;text-align:left;padding:7px 10px;background:none;border:none;cursor:pointer;
+                 font-size:0.78rem;color:var(--text-dim,#888);display:flex;align-items:center;gap:6px">
+          <span id="timeAiInsightIcon" style="font-size:10px;color:var(--accent,#4f8ef7)">${wasOpen ? '▼' : '▶'}</span>
+          ${icon} <strong style="color:var(--text,#dde3f5)">AI 洞察</strong>
+          <span class="ladash-t-chart-sub">${title}</span>
+          <span style="font-size:10px;opacity:0.6;margin-left:auto">點擊展開</span>
+        </button>
+        <div id="timeAiInsightBody" class="ladash-t-pre" style="display:${wasOpen ? 'block' : 'none'};padding:0 10px 10px 10px">${message}</div>
       </div>`;
     el.querySelectorAll("[data-bg]").forEach(function(d) {
       if (d.dataset.bg) d.style.setProperty("background", d.dataset.bg);
       if (d.dataset.border) d.style.setProperty("border-color", d.dataset.border);
     });
+    // 摺疊開關由 help-modal.js 內統一的 delegated click listener 處理
+    // （比照 corrInfoToggleBtn）。
   }
 
   // ────────────────────────────────────────────────────────────

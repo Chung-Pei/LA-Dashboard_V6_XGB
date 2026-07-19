@@ -325,15 +325,20 @@ const HELP_CONTENT = {
   },
 
   preExamChart: {
-    title: '平時及考前學習強度分型（V2.1）',
+    title: '平時及考前學習強度分型定義（規格書 V2.1）',
     sections: [
-      { type: 'desc', text: '核心指標：T_total（期間總閱讀時數）、P_pre = T_pre ÷ T_total × 100%（考前 7 天占比）。' },
+      { type: 'desc', text: '核心指標：T_total（統計期間總閱讀時數）、T_pre（考前 7 天累計時數）、P_pre = T_pre ÷ T_total × 100%。' },
+      { type: 'heading', text: '判定優先順序（MECE）' },
       { type: 'points', items: [
-        '① 學習低投入型：T_total < P15 門檻，學習量不足，不分析節奏',
+        '① 學習低投入型：T_total < P15 門檻（全體最低 15%），學習量不足，不分析節奏',
         '② 高度衝刺型：P_pre ≥ 30%（集中學習 Massed Practice）',
         '③ 規律分散型：10% ≤ P_pre < 30%（分散學習 Distributed Practice）',
         '④ 提早完成型：P_pre < 10%（前置規劃 Pre-planning）',
       ]},
+      // NOTE-preExamP15：note 為動態值，每次 tab-behavior-time.js 的
+      // _renderPreExamSummary() 重繪時會依目前篩選條件就地更新（見該檔
+      // 「TASK-B」註記），沿用同一個物件參照，不可整個取代 sections 陣列。
+      { type: 'metric', name: '本次 P15 門檻', note: '（尚未計算，請先切換到時間分析分頁）' },
       { type: 'use', text: '識別備考模式與成效的關係，引導學生調整學習策略。' },
     ],
   },
@@ -544,6 +549,11 @@ const HELP_CONTENT = {
       ]},
       { type: 'heading', text: '👥 三組篩選' },
       { type: 'desc', text: '全體 / 及格組 / 不及格組 — 比較不同學習成效學生的行為序列差異，有助於辨識高效與低效的學習模式。' },
+      { type: 'heading', text: '📇 資源分群卡片與學習行為洞察' },
+      { type: 'points', items: [
+        '卡片／洞察比較的是「條件轉移機率」（M→M、Q→Q 持續率），不是直接比較 Z-score：各分群人數差異極大（如 R2 僅 4 人、R1 近千人），Z-score 會隨樣本數等比放大，直接比大小沒有統計意義；轉移機率不受樣本數影響，才能公平比較。',
+        '卡片人數以 LSA 可分析樣本（有足夠連續行為紀錄的學生）為準，會略少於「資源使用雷達圖」分頁顯示的人數，屬正常現象，非資料錯誤。',
+      ]},
     ],
   },
 
@@ -874,12 +884,23 @@ document.addEventListener('click', (e) => {
     return;
   }
 
-  if (e.target.closest('#corrInfoToggleBtn')) {
-    const body = document.getElementById('corrInfoBody');
-    const icon = document.getElementById('corrInfoIcon');
+  // UNIFY-C：統一摺疊式說明卡片 toggle 邏輯，以 corrInfoToggleBtn 為範本，
+  // 涵蓋相關性分析／行為預測分析／提前預警／時間分析共 4 張說明卡片
+  // （btnId, bodyId, iconId 三元組，結構一致）。
+  const _INFO_CARD_TOGGLES = [
+    ['corrInfoToggleBtn',       'corrInfoBody',       'corrInfoIcon'],
+    ['crossScopeToggleBtn',     'crossScopeBody',     'crossScopeIcon'],
+    ['warningInfoToggleBtn',    'warningInfoBody',    'warningInfoIcon'],
+    ['timeAiInsightToggleBtn',  'timeAiInsightBody',  'timeAiInsightIcon'],
+  ];
+  for (const [btnId, bodyId, iconId] of _INFO_CARD_TOGGLES) {
+    if (!e.target.closest('#' + btnId)) continue;
+    const body = document.getElementById(bodyId);
+    const icon = document.getElementById(iconId);
     if (!body) return;
     const open = body.style.display !== 'none';
     body.style.setProperty('display', open ? 'none' : 'block');
     if (icon) icon.textContent = open ? '▶' : '▼';
+    return;
   }
 });
