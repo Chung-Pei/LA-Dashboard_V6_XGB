@@ -1477,6 +1477,9 @@ function switchCView(view) {
   document.getElementById('cFilterGeneral').style.setProperty('display', isGeneral ? '' : 'none');
   document.getElementById('cFilterRetake').style.setProperty('display', isGeneral ? 'none' : '');
   document.getElementById('cResetBtn').style.setProperty('display', '');
+  // BUGFIX-0719: cStats 為「全體學生」專用統計卡列，重修分析已有專屬的 bStats（含「重修概況統計」標題與說明按鈕）
+  // 切至重修分析時隱藏 cStats，避免與 bStats 重複顯示相同數據
+  document.getElementById('cStats').style.setProperty('display', isGeneral ? '' : 'none');
 
   if (isGeneral) {
     _resetCGeneralFilters();
@@ -1733,7 +1736,7 @@ function renderCView() {
     renderCAnomalyAndDist();
     renderCStats();
   } else {
-    renderCRetakeStats();
+    // BUGFIX-0719: renderCRetakeStats() 已移除 — 其輸出與 renderB() 內的 bStats 完全重複（同一份 getRetakerRecords() 計算結果）
     renderB();
     renderRetakerFirstDist();
   }
@@ -1872,28 +1875,6 @@ function renderCStats() {
     <div class="stat-card" data-ac="var(--red)" title="不及格人數佔比，不及格者下學期須至他班重修">
       <div class="val">${(100-parseFloat(passRate)).toFixed(1)}%</div>
       <div class="lbl">不及格率 Fail Rate <span style="font-size:9px;opacity:.7">（≈重修率）</span></div>
-    </div>
-  `;
-}
-
-function renderCRetakeStats() {
-  const retakers = getRetakerRecords();
-  const allDeltas = retakers.flatMap(r => r.recs.filter(rec => rec.delta != null).map(rec => rec.delta));
-  const improved = allDeltas.filter(d=>d>0).length;
-  const worsened = allDeltas.filter(d=>d<0).length;
-  const avgDelta = allDeltas.length ? (allDeltas.reduce((a,b)=>a+b,0)/allDeltas.length).toFixed(1) : '–';
-  document.getElementById('cStats').innerHTML = `
-    <div class="stat-card" data-ac="var(--accent4)">
-      <div class="val">${retakers.length}</div><div class="lbl">重修學生</div>
-    </div>
-    <div class="stat-card" data-ac="var(--green)">
-      <div class="val">${improved}</div><div class="lbl">進步 Δ &gt; 0</div>
-    </div>
-    <div class="stat-card" data-ac="var(--red)">
-      <div class="val">${worsened}</div><div class="lbl">退步 Δ &lt; 0</div>
-    </div>
-    <div class="stat-card" data-ac="var(--accent3)">
-      <div class="val">${avgDelta}</div><div class="lbl">平均 Δ</div>
     </div>
   `;
 }

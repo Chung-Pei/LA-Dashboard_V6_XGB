@@ -142,30 +142,27 @@ const BehaviorRadarTab = (() => {
 
   function _renderControls(containerId){
     const el=document.getElementById(containerId);if(!el)return;
-    // B3 fix: semOpts was dead code (built but never inserted into HTML); removed
     const noteHtml=_semesterFilterNote?`<div class="ladash-brt-note">${_semesterFilterNote}</div>`:"";
-    // 學期膠囊（規格書 §四-A）
-    const semCapsules=_allSemesters.length?[
-      `<button class="brt-sem${_selectedSemester==="all"?" brt-semA":""}" data-semester="all">全部</button>`,
-      ..._allSemesters.map(s=>`<button class="brt-sem${s===_selectedSemester?" brt-semA":""}" data-semester="${s}">${_formatSemester(s)}</button>`)
-    ].join(""):"";
-    // CSP-3 FIX: 移除 inline style="--cc:...;--cb:..."，改在 innerHTML 後以 DOM API setProperty 注入
-    // element.style.setProperty() 為 DOM API，不受 style-src CSP 限制
-    const clBtns=Object.entries(CLUSTER_NAMES).map(([k,n])=>`<button class="brt-cl${k===_selectedCluster?" brt-clA":""}" data-cluster="${k}" data-cc="${CLUSTER_COLORS[k].border}" data-cb="${CLUSTER_COLORS[k].bg}"><span class="brt-code">${k}</span> ${n}</button>`).join("");
-    const pfBtns=[{key:"all",lbl:"全體"},{key:"pass",lbl:"✅ 及格"},{key:"fail",lbl:"❌ 不及格"}].map(({key,lbl})=>`<button class="brt-pf${key===_passFilter?" brt-pfA":""}" data-pass-filter="${key}">${lbl}</button>`).join("");
+    // 篩選 UI 統一改為下拉選單形式，與「時間分析」分頁篩選列一致（規格：UI-SYNC-RADAR-1）
+    const semOptions=[
+      `<option value="all"${_selectedSemester==="all"?" selected":""}>全部年度</option>`,
+      ..._allSemesters.map(s=>`<option value="${s}"${s===_selectedSemester?" selected":""}>${_formatSemester(s)}</option>`)
+    ].join("");
+    const clusterOptions=Object.entries(CLUSTER_NAMES).map(([k,n])=>
+      `<option value="${k}"${k===_selectedCluster?" selected":""}>${k} ${n}</option>`
+    ).join("");
+    const passOptions=[{key:"all",lbl:"全部"},{key:"pass",lbl:"及格"},{key:"fail",lbl:"不及格"}]
+      .map(({key,lbl})=>`<option value="${key}"${key===_passFilter?" selected":""}>${lbl}</option>`).join("");
+    const filteredN=_filteredCount(_selectedCluster);
     // CSP-2 FIX: 改用 adoptedStyleSheets，移除動態 <style> 注入
     const styleId = "brt-adopted-style";
     if (!document.getElementById(styleId)) {
       const CSS_TEXT = `
-        .brt-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px}
-        .brt-lbl{font-size:.78rem;color:var(--text-dim,#888);white-space:nowrap;min-width:72px}
-        .brt-cl{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:20px;border:1.5px solid var(--cc);background:transparent;color:var(--cc);font-size:.78rem;cursor:pointer;transition:background .15s;font-family:inherit}
-        .brt-clA{background:var(--cb);font-weight:700}
-        .brt-code{font-weight:700;font-family:'JetBrains Mono','Courier New',monospace}
-        .brt-pf{padding:4px 12px;border-radius:20px;border:1.5px solid var(--accent,#3498db);background:transparent;color:var(--accent,#3498db);font-size:.78rem;cursor:pointer;transition:background .15s;font-family:inherit}
-        .brt-pfA{background:var(--accent,#3498db);color:#fff;font-weight:700}
-        .brt-sem{padding:3px 9px;border-radius:14px;border:1px solid var(--border2,#353c58);background:var(--surface2,#1c2030);color:var(--text-dim,#888);font-size:.76rem;font-family:'JetBrains Mono','Courier New',monospace;cursor:pointer;transition:all .15s;white-space:nowrap}
-        .brt-semA{background:var(--accent,#3498db);color:#fff;border-color:var(--accent,#3498db);font-weight:700}
+        .ladash-t-filter-panel{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:6px;padding:8px 12px;border:1px solid rgba(110,130,165,.22);border-radius:10px;background:var(--card-bg2,#1c2030)}
+        .ladash-t-filter-lbl{font-size:.8rem;font-weight:700;color:var(--text-mid,#4f5f78);white-space:nowrap}
+        .ladash-t-filter-grp{display:flex;align-items:center;gap:4px;font-size:.78rem;color:var(--text-dim,#888);flex-shrink:0}
+        .ladash-t-filter-sel{font-size:.78rem;padding:2px 4px;border-radius:7px;border:1px solid var(--border,#2a2f45);background:var(--surface2,#1c2030);color:var(--text-mid,#9aa0b8);cursor:pointer}
+        .ladash-t-dim-xs{font-size:.76rem;color:var(--text-dim,#888)}
         .ladash-cc-wrap{display:flex;flex-direction:row;align-items:stretch;overflow-x:auto;padding:4px 2px 8px}
         .behavior-cluster-card{border-radius:8px;box-shadow:0 2px 8px rgba(20,35,60,.06)}
         .ladash-cc-total{border:1px solid rgba(46,204,113,.28);background:rgba(46,204,113,.08)}
@@ -204,7 +201,6 @@ const BehaviorRadarTab = (() => {
         .ladash-ins-export-btn{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:20px;background:transparent;font-size:.78rem;font-weight:600;cursor:pointer;font-family:inherit;transition:background .15s}
         .ladash-ins-export-cnt{font-size:.72rem;color:var(--text-dim,#888);margin-left:8px}
         .ladash-brt-wrap{display:flex;flex-direction:column;gap:2px}
-        .ladash-brt-caps{display:flex;flex-wrap:wrap;gap:4px}
         .ladash-brt-note{font-size:.76rem;color:var(--accent3,#e67e22);margin-top:3px;margin-bottom:6px}
         .ladash-brt-str-diff{color:var(--green,#64d4a8)}
         .ladash-brt-gap-diff{color:var(--red,#f07070)}
@@ -236,28 +232,33 @@ const BehaviorRadarTab = (() => {
       }
     }
     el.innerHTML=`<div class="ladash-brt-wrap">
-      ${semCapsules?`<div class="brt-row"><span class="brt-lbl">學期</span><div class="ladash-brt-caps">${semCapsules}</div></div>${noteHtml}`:""}
-      <div class="brt-row"><span class="brt-lbl">依資源使用</span>${clBtns}</div>
-      <div class="brt-row"><span class="brt-lbl">及格狀況</span>${pfBtns}</div>
+      <div class="ladash-t-filter-panel">
+        <span class="ladash-t-filter-lbl">篩選條件</span>
+        <label class="ladash-t-filter-grp">學期
+          <select id="radarSemFilter" class="ladash-t-filter-sel">${semOptions}</select>
+        </label>
+        <label class="ladash-t-filter-grp">資源使用
+          <select id="radarClusterFilter" class="ladash-t-filter-sel">${clusterOptions}</select>
+        </label>
+        <label class="ladash-t-filter-grp">及格
+          <select id="radarPassFilter" class="ladash-t-filter-sel">${passOptions}</select>
+        </label>
+        <span id="radarFilterCount" class="ladash-t-dim-xs">共 ${filteredN.toLocaleString()} 筆</span>
+      </div>
+      ${noteHtml}
     </div>`;
     _bindControlEvents(el);
-    // CSP-3 FIX: innerHTML 後以 DOM API 注入 CSS custom properties（不受 style-src 限制）
-    el.querySelectorAll("[data-cluster][data-cc]").forEach(btn => {
-      if (btn.dataset.cc) btn.style.setProperty("--cc", btn.dataset.cc);
-      if (btn.dataset.cb) btn.style.setProperty("--cb", btn.dataset.cb);
-    });
   }
 
   function _bindControlEvents(el){
-    el.querySelectorAll("[data-semester]").forEach(btn=>{
-      btn.addEventListener("click",()=>onYearChange(btn.dataset.semester));
-    });
-    el.querySelectorAll("[data-cluster]").forEach(btn=>{
-      btn.addEventListener("click",()=>selectCluster(btn.dataset.cluster));
-    });
-    el.querySelectorAll("[data-pass-filter]").forEach(btn=>{
-      btn.addEventListener("click",()=>selectPassFilter(btn.dataset.passFilter));
-    });
+    // 下拉選單以 change 事件觸發，並呼叫既有的 onYearChange/selectCluster/selectPassFilter
+    // 以維持與雷達圖、洞察面板、分群卡片間原本的連動邏輯不變。
+    const semSel=el.querySelector("#radarSemFilter");
+    if(semSel)semSel.addEventListener("change",()=>onYearChange(semSel.value));
+    const clSel=el.querySelector("#radarClusterFilter");
+    if(clSel)clSel.addEventListener("change",()=>selectCluster(clSel.value));
+    const pfSel=el.querySelector("#radarPassFilter");
+    if(pfSel)pfSel.addEventListener("change",()=>selectPassFilter(pfSel.value));
   }
 
   function onYearChange(semester){
