@@ -429,7 +429,7 @@ const BehaviorWarningTab = (() => {
                 ${auc != null ? Number(auc).toFixed(3) : "N/A"}
                 <span class="ladash-w-auc-badge" data-auc-badge-clr="${aucInfo.color}">${_safeText(aucInfo.text)}</span>
               </div>
-              <div class="ladash-w-metric-sub">以 BAS 分數排序（越低→風險越高）</div>
+              <div class="ladash-w-metric-sub">依最終風險等級排序（BAS+XGBoost 綜合判定，HIGH→風險最高）</div>
             </div>
             <div class="ladash-w-metric-card">
               <div class="ladash-w-metric-label">整體召回率（Recall）</div>

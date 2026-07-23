@@ -449,7 +449,15 @@ const AtRiskReportManager = (() => {
     if (!_warningData || !_warningSemester) return null;
     // WARN-ATRISK-1 FIX: 移除 '__all__' 條件。
     // __all__ 使用跨學期聚合資料，混入單一學期的提前預警摘要語意不一致。
-    if (_currentSem !== _warningSemester) return null;
+    // BUG-ATRISK-8 FIX（0721 穿透式審查發現，既有問題非本輪修改造成）：
+    // _currentSem 沿用 at_risk_profile.json 的 by_semester 鍵值格式「114(2)」，
+    // 但 _warningSemester 來自 cross_analysis.json/warning_*.json 的 semester
+    // 鍵值格式「1142」，兩者格式不同，原本的 `!==` 字串比對恆為 true（永遠視為
+    // 不相等），導致本卡片無論切到哪個學期都不會顯示——並非本學期剛好都不符合
+    // 條件，而是條件本身永遠不可能成立。改為只取數字部分再比對，兩種格式都能
+    // 正確辨識為同一學期。
+    const _semDigits = (v) => String(v ?? '').replace(/\D/g, '');
+    if (_semDigits(_currentSem) !== _semDigits(_warningSemester) || !_semDigits(_currentSem)) return null;
 
     const s = _warningData.summary;
     const m = _warningData.meta;
@@ -467,15 +475,14 @@ const AtRiskReportManager = (() => {
     const _pct = (v) => (typeof v === 'number' && !isNaN(v)) ? `約 ${(v * 100).toFixed(0)}%` : '無歷史參考值';
 
     let body =
-      `🔎 「提前預警」依111(1)–114(1)等已有期末成績學期建立 BAS/QMI 規則，` +
-      `並納入 XGBoost 機率取較高風險層級，對 ${_warningSemester} 學期 ${m.total_students} 名學生` +
-      `於期中考後進行雙軌分級預測（${m.data_cutoff ?? ''}）。\n\n` +
+      `🔎 「提前預警」依 BAS（規則式）＋XGBoost（機器學習）雙軌模型，對 ${_warningSemester}` +
+      `學期 ${m.total_students} 名學生於期中考後進行風險分級（${m.data_cutoff ?? ''}）；` +
+      `兩模型分歧時的合併規則、完整名單與個別篩選請至「🔮 提前預警」分頁查看。\n\n` +
       `📊 高風險：${s.HIGH.count} 人（同等級歷史不及格率${_pct(s.HIGH.historical_fail_rate_ref)}）。\n` +
       `📊 中度風險：${s.MEDIUM.count} 人（${_pct(s.MEDIUM.historical_fail_rate_ref)}）。\n` +
       `📊 低風險：${s.LOW.count} 人（${_pct(s.LOW.historical_fail_rate_ref)}）。\n\n` +
       `💡 解讀：建議將高風險名單與上方其他紅旗警示（低完成率、連續零活動、期中後衰退）交叉比對，` +
-      `若同一學生同時出現在多項警示中，應列為第一優先介入對象。` +
-      `完整名單與個別篩選請至「🔮 提前預警」分頁查看。`;
+      `若同一學生同時出現在多項警示中，應列為第一優先介入對象。`;
 
     // 防線3：若已載入 validated 版本，補充驗證摘要
     if (_warningData?.meta && "validation_date" in _warningData.meta) {

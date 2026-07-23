@@ -172,17 +172,46 @@ const BehaviorCorrelationTab = (() => {
     return raw;
   }
 
-  // Inject filter bar CSS that was missing
-  const _FILTER_CSS = `
-    .ladash-c-filter-bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 15px; }
-    .ladash-c-flex5 { display: flex; gap: 6px; align-items: center; }
-    .ladash-c-sm8-bold-nw { font-size: 0.85rem; font-weight: bold; white-space: nowrap; color: var(--text, #eee); }
-    .ladash-c-sm78-nw { font-size: 0.78rem; white-space: nowrap; color: var(--text-dim, #888); }
-    .ladash-c-filter-sel { padding: 4px 8px; font-size: 0.8rem; border-radius: 4px; background: var(--surface3, #2a2f45); color: var(--text, #eee); border: 1px solid var(--border, #3a405a); outline: none; }
-  `;
-  const styleEl = document.createElement("style");
-  styleEl.textContent = _FILTER_CSS;
-  document.head.appendChild(styleEl);
+  // FILTER-BAR-CSP-FIX（0721）：原本這裡用 document.head.appendChild(<style>)
+  // 直接注入無 nonce 的 <style> 標籤，違反本專案稍早已完成的 CSP 合規慣例
+  // （unsafe-inline 已於先前版本移除，見 README「GitHub Pages cache fix」）。
+  // 改用與本檔 _injectCorrStyle／_injectCorrStaticStyle 一致的
+  // adoptedStyleSheets + nonce fallback 寫法，並補上 sentinel 防重複注入。
+  // 篩選面板規格同步比照「時間分析」分頁 .ladash-t-filter-panel 模板
+  // （邊框＋圓角＋底色＋nowrap+橫向捲動），取代原本無邊框、會換行的陽春 flex-bar。
+  const _FILTER_STYLE_ID = "__ladash-corr-filter-style";
+  function _injectFilterBarStyle() {
+    if (document.getElementById(_FILTER_STYLE_ID)) return;
+    const CSS = `.ladash-c-filter-bar{display:flex;flex-wrap:nowrap;overflow-x:auto;align-items:center;gap:8px;margin-bottom:12px;padding:8px 12px;border:1px solid rgba(110,130,165,.22);border-radius:10px;background:var(--card-bg2,#1c2030);white-space:nowrap}
+    .ladash-c-flex5{display:flex;align-items:center;gap:4px;font-size:.78rem;color:var(--text-dim,#888);flex-shrink:0}
+    .ladash-c-sm8-bold-nw{font-size:.8rem;font-weight:700;color:var(--text-mid,#4f5f78);white-space:nowrap;flex-shrink:0}
+    .ladash-c-sm78-nw{font-size:.78rem;color:var(--text-dim,#888);white-space:nowrap}
+    /* CHECKBOX-ZERO-SIZE-FIX（0721 穿透式審查發現，既有問題非本輪修改造成）：
+       全站 index.html 第803行 input,button,select,textarea{-webkit-appearance:none}
+       會移除 checkbox 原生外觀，若未補上替代寬高會直接收合為 0x0（僅能點擊 label
+       文字觸發，勾選框本身不可見/不可點）。全站唯二使用 checkbox 的地方——print-panel.js
+       的 .print-choice（index.html 第1113-1116行）已針對此問題補過 appearance:checkbox
+       +固定寬高的修正；本篩選列的排除異常值 checkbox 當初漏補，這裡比照同一手法修正。 */
+    .ladash-c-filter-bar input[type="checkbox"]{-webkit-appearance:checkbox;-moz-appearance:checkbox;appearance:checkbox;width:14px;height:14px;flex:0 0 auto;accent-color:var(--accent,#4f8ef7);cursor:pointer}`;
+    const sentinel = document.createElement("meta");
+    sentinel.id = _FILTER_STYLE_ID;
+    if (typeof CSSStyleSheet !== "undefined" && CSSStyleSheet.prototype.replaceSync) {
+      try {
+        const sheet = new CSSStyleSheet();
+        sheet.replaceSync(CSS);
+        document.adoptedStyleSheets = [...(document.adoptedStyleSheets || []), sheet];
+        sentinel.setAttribute("data-csp-adopted", "1");
+        document.head.appendChild(sentinel);
+        return;
+      } catch (_) { /* fallback */ }
+    }
+    const el = document.createElement("style");
+    el.id = _FILTER_STYLE_ID;
+    const nonce = _CSP_NONCE;
+    if (nonce) el.setAttribute("nonce", nonce);
+    el.textContent = CSS;
+    document.head.appendChild(el);
+  }
 
   /**
    * Ph2b 新增：讀取 p-value（僅 Pearson 模式下有效）。
@@ -556,40 +585,37 @@ const BehaviorCorrelationTab = (() => {
 
     const hasOutlierData = Object.keys(_corrData?.outlier_thresholds || {}).length > 0;
 
+    _injectFilterBarStyle();
+
     const bar = document.createElement("div");
     bar.id = "corrFilterBar";
     bar.className = "ladash-c-filter-bar";
     bar.innerHTML = `
       <span class="ladash-c-sm8-bold-nw">篩選條件</span>
-      <div class="ladash-c-flex5">
-        <label class="ladash-c-sm78-nw">學期</label>
+      <label class="ladash-c-flex5">學期
         <select id="corrSemFilter"
                 class="ladash-c-filter-sel">
           ${semOptions}
         </select>
-      </div>
-      <div class="ladash-c-flex5">
-        <label class="ladash-c-sm78-nw">資源使用</label>
+      </label>
+      <label class="ladash-c-flex5">資源使用
         <select id="corrClusterFilter"
                 class="ladash-c-filter-sel">
           ${clusterOptions}
         </select>
-      </div>
-      <div class="ladash-c-flex5">
-        <label class="ladash-c-sm78-nw">及格狀況</label>
+      </label>
+      <label class="ladash-c-flex5">及格狀況
         <select id="corrPassFilter"
                 class="ladash-c-filter-sel">
           ${passOptions}
         </select>
-      </div>
+      </label>
       ${hasOutlierData ? `
-      <div class="ladash-c-flex5">
-        <label class="ladash-c-sm78-nw-ptr" for="corrOutlierToggle">
-          <input type="checkbox" id="corrOutlierToggle"
-                 class="ladash-c-mr4-ptr">
-          排除異常值
-        </label>
-      </div>` : ""}
+      <label class="ladash-c-flex5 ladash-c-sm78-nw-ptr" for="corrOutlierToggle">
+        <input type="checkbox" id="corrOutlierToggle"
+               class="ladash-c-mr4-ptr">
+        排除異常值
+      </label>` : ""}
       <span id="corrFilterCount" class="ladash-c-xs76-dim"></span>
       <span class="ladash-c-ml-auto-flex">
         <span class="ladash-c-xs76-dim">方法</span>

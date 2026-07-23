@@ -928,9 +928,12 @@ const BehaviorLsaTab = (() => {
     try {
       svg = d3.select(container).append("svg")
         .attr("width",  "100%")
-        .attr("height", "auto")
         .attr("viewBox", `0 0 ${W} ${H}`)
         .attr("preserveAspectRatio", "xMidYMid meet")
+        .style("height", "auto")   // SVG-HEIGHT-AUTO-FIX（0721）：height 為 CSS 概念，
+                                    // 用 .attr() 設成 SVG 屬性會被瀏覽器判定為不合法的
+                                    // length 值（"Expected length, 'auto'"），改用 .style()
+                                    // 設定 CSS height，視覺效果不變（仍由 viewBox 決定比例）。
         .style("font-family", "sans-serif")
         .style("display", "block");
     } catch (e) {

@@ -388,7 +388,7 @@ const HELP_CONTENT = {
       { type: 'desc', text: '彙整六項學習行為與成績表現的關鍵統計指標，用於評估行為分群與學習結果的關聯強度。' },
       { type: 'points', items: [
         '全體不及格率：訓練集中期末成績不及格學生佔比，並列出期中不及格率對照，觀察學期後段是否好轉',
-        'BAS 複合評分（r）：BAS = 期中成績×0.35 + QMI×0.30 + (1−被動指數)×0.20 + log(練習次數)×0.15，r 為 BAS 與期末成績的 Pearson 相關係數，越接近 1 代表綜合行為指標與成績正相關越強',
+        'BAS 複合評分（r）：BAS = 期中成績×0.35 + QMI×0.30 + (1−被動指數)×0.20 + log(練習次數)×0.15（皆先轉Z分數再加權），r 為 BAS 與期末成績的 Pearson 相關係數，越接近 1 代表綜合行為指標與成績正相關越強。※此為訓練集用的4項版本；「提前預警」頁籤因期中考後尚無完整作答次數，改用3項版本（不含log(練習次數)），兩者數值不可直接比較。',
         'QMI 五分位梯度：依題庫精熟指數切五等分，比較最低分組（Q1）與最高分組（Q5）的不及格率差距，差距越大代表 QMI 對不及格的區辨力越強',
         'R群 × 期末 Spearman（ρ）：R群為教材使用行為分群（類別變數），ρ 衡量分群與期末成績排名的等級相關；R群非品質次序，不可作線性外推解讀',
         'S群 × 期末 Spearman（ρ）：S群依序列轉移穩定性排序（S1最穩定 → S5風險最高，序列事件不足未分類者不納入計算），ρ 方向符合預期時，代表序列越不穩定成績越差',
@@ -405,7 +405,7 @@ const HELP_CONTENT = {
       { type: 'metric', name: 'AUC — 模型區辨力',
         desc: '衡量模型能否將「期末不及格」與「及格」學生正確排序的能力，數值越高代表排序能力越好。',
         formula: '以模型輸出的「不及格機率」為預測分數，計算 ROC 曲線下面積（AUC-ROC）',
-        note: 'AUC = 0.5 等同隨機猜測；AUC = 1.0 為完美區辨。一般 ≥0.70 視為具實務參考價值。\n※ 此為 Week 12 特徵模型的 AUC，與「預警指標說明」中 BAS 模型的 AUC 為不同模型，數值不可直接比較。' },
+        note: 'AUC = 0.5 等同隨機猜測；AUC = 1.0 為完美區辨。一般 ≥0.70 視為具實務參考價值。\n※ 此為 Week 12 特徵模型自身輸出機率的 AUC，與「提前預警」頁籤「預警指標說明」中系統最終風險等級（BAS+XGBoost 綜合判定後）的驗證 AUC 為不同計算基礎，數值不可直接比較。' },
       { type: 'metric', name: 'Precision — 命中率',
         desc: '模型判定為「高風險（可能不及格）」的學生中，實際期末不及格的比例。',
         formula: 'Precision = 真陽性 ÷（真陽性 + 假陽性）',
@@ -457,22 +457,31 @@ const HELP_CONTENT = {
   warningHelp: {
     title: '📊 預警指標說明',
     sections: [
+      { type: 'desc', text: '目前的風險等級由「BAS 規則式評分」與「XGBoost 機器學習模型」兩組獨立判定合併而成，而非單一模型決定，以下逐一說明兩者及合併規則。' },
       { type: 'metric', name: 'BAS — 行為分析分數',
-        desc: '綜合衡量學生在課程期間的線上學習投入程度。',
-        formula: 'BAS = w₁×活躍天數比 + w₂×閱讀深度 + w₃×QMI + w₄×期中分數 + w₅×被動指數（對數正規化）',
-        note: '分數越低代表行為投入越少、不及格風險越高（範圍 0–1）。' },
+        desc: '綜合衡量學生在課程期間的線上學習投入程度（皆先轉為Z分數再加權）。',
+        formula: 'BAS（提前預警版，3項）= 期中成績×0.35 + QMI×0.30 + (負)被動指數×0.20\n※「行為預測分析」頁籤的BAS另含log(練習次數)×0.15第4項（訓練集用，含完整學期作答次數）；提前預警為期中考後即時預測，尚無完整作答次數可用，故用3項版本，兩者數值不可直接比較。',
+        note: '為Z分數加權組合，非0–1定值範圍，可能為負值（例如−2、−1 等）；分數越低代表行為投入越少、不及格風險越高。' },
       { type: 'metric', name: 'QMI — 題庫精熟指數',
-        desc: '反映學生在題庫練習上的「答對品質」與「持續投入」。',
-        formula: 'QMI = (加權正確率 × 0.6) + (作答週數覆蓋比 × 0.4)',
-        note: '範圍 0–1；QMI < 0.45 視為精熟度偏低的風險訊號。' },
-      { type: 'metric', name: '風險等級（HIGH / MEDIUM / LOW）',
-        desc: '依 BAS 與 QMI 門檻組合，對照訓練集歷史資料所得：',
+        desc: '反映學生在題庫練習上的「答對品質」，是 BAS 的其中一項輸入。',
+        formula: 'QMI = 首次作答正確率×0.55 + 最終正確率×0.45 − max(進步量,0)×0.30\n（進步量＝最終正確率相對首次作答的提升幅度；愈需要多次修正才答對，QMI愈受影響）',
+        note: '範圍約0–1；精熟度偏低的門檻依2技/4技學制歷史資料的20/40百分位數動態校準，非固定數值。' },
+      { type: 'metric', name: 'BAS 風險等級（risk_level_bas）',
+        desc: '依 BAS 與 QMI 門檻組合，對照訓練集歷史資料所得的其中一項判定依據：',
         note: 'HIGH — BAS 低且 QMI 偏低；歷史不及格率約 33%\nMEDIUM — 部分指標偏低；歷史不及格率約 23%\nLOW — 整體表現良好；歷史不及格率約 13%' },
+      { type: 'metric', name: 'XGBoost — 機器學習預測機率（risk_level_xgb）',
+        desc: '以學生完整學習歷程行為特徵訓練的分類模型，直接輸出「不及格機率」（xgb_probability），為另一項獨立判定依據。',
+        formula: 'xgb_probability（0–1）→ 對照歷史資料校準之機率門檻（依 2 技/4 技學制分別校準）→ 分為 HIGH／MEDIUM／LOW',
+        note: '門檻由系統依訓練集歷史資料自動校準，非固定數值；若 XGBoost 未啟用或該學期訓練樣本不足，該學生僅採 BAS 判定（來源標示為 BAS）。' },
+      { type: 'metric', name: '最終風險等級如何合併（risk_level_final）',
+        desc: '名單與摘要卡顯示的「風險等級」是 BAS 與 XGBoost 兩者合併後的結果：',
+        formula: '雙方一致 → 採該等級（來源 BAS+XGB）\n相差一級（如 MEDIUM vs HIGH）→ 取較高風險（來源 BAS 或 XGB，視哪一方較高）\n相差兩級（HIGH vs LOW，模型嚴重分歧）→ 不直接判 HIGH，降級為 MEDIUM 並標記 model_disagreement（來源 BAS-ONLY／XGB-ONLY）',
+        note: '模型嚴重分歧的個案會加註「W-MODEL-DISAGREE」輔助規則標籤，交由人工複核，系統刻意不將分歧情況自動判定為最高風險。' },
       { type: 'heading', text: '✅ 前瞻性驗證指標' },
       { type: 'metric', name: 'AUC — 模型區辨力',
-        desc: '衡量 BAS 分數能否將「最終不及格」和「及格」的學生正確排序的能力。',
-        formula: '計算方式：以 −BAS 為預測分數，對 actual_outcome（FAIL=1）做 ROC 梯形積分',
-        note: '≥0.80 優良 — 能可靠地分辨高低風險\n0.70–0.79 良好 — 有效區辨，少量誤判\n0.60–0.69 尚可 — 有參考價值但需輔助判斷\n<0.60 偏低 — 區辨力不足，建議搭配人工審閱\nAUC = 0.5 代表與隨機猜測無異；1.0 代表完美區辨。' },
+        desc: '衡量系統最終風險等級（risk_level_final，BAS 與 XGBoost 綜合判定後）能否將「最終不及格」和「及格」的學生正確排序的能力。',
+        formula: '以各學生最終風險等級（HIGH＞MEDIUM＞LOW 視為風險序位）為預測分數，對 actual_outcome（FAIL=1）做 ROC 梯形積分',
+        note: '≥0.80 優良 — 能可靠地分辨高低風險\n0.70–0.79 良好 — 有效區辨，少量誤判\n0.60–0.69 尚可 — 有參考價值但需輔助判斷\n<0.60 偏低 — 區辨力不足，建議搭配人工審閱\nAUC = 0.5 代表與隨機猜測無異；1.0 代表完美區辨。\n※ 此為系統最終風險等級的驗證 AUC，與「行為預測分析」頁籤 XGBoost 模型效能卡的 AUC（模型自身輸出機率的區辨力）為不同計算基礎，數值不可直接比較。' },
       { type: 'metric', name: '校準誤差（Calibration Error）',
         desc: '衡量各風險組的「預測不及格率」與「實際不及格率」的差距。',
         formula: '校準誤差 = 實際不及格率 − 歷史預測不及格率（單位：百分點 pp）',
@@ -507,11 +516,11 @@ const HELP_CONTENT = {
         'AUD 音頻時數：音檔、語音講解等聽覺教材的累積使用時間',
       ]},
       { type: 'heading', text: '數值如何計算？' },
-      { type: 'desc', text: '每個維度取「該組學生的中位數原始值」，再以全體學生中位數為基準做正規化，換算到 0–100 的分數：' },
+      { type: 'desc', text: '每個維度取「該組學生的中位數原始值」，再以全體學生（不分及格/不及格）的最小值與最大值為基準做 Min-Max 正規化，換算到 0–100 的分數：' },
       { type: 'points', items: [
-        '100 分 = 表現等同全體中位數的 2 倍（最高值）',
-        '50 分 = 表現等同全體中位數（平均水準）',
-        '0 分 = 幾乎未使用該資源',
+        '100 分 = 該組中位數等於全體學生中的最大值',
+        '0 分 = 該組中位數等於全體學生中的最小值',
+        '數字愈接近 100，代表該組在該維度的中位數愈接近全體最高水準；反之愈接近 0 代表愈接近全體最低水準',
       ]},
       { type: 'heading', text: '如何讀圖？' },
       { type: 'points', items: [
@@ -885,11 +894,12 @@ document.addEventListener('click', (e) => {
   }
 
   // UNIFY-C：統一摺疊式說明卡片 toggle 邏輯，以 corrInfoToggleBtn 為範本，
-  // 涵蓋相關性分析／行為預測分析／提前預警／時間分析共 4 張說明卡片
-  // （btnId, bodyId, iconId 三元組，結構一致）。
+  // 涵蓋相關性分析／行為預測分析（資料範圍＋BAS/XGBoost雙軌說明）／提前預警／
+  // 時間分析共 5 張說明卡片（btnId, bodyId, iconId 三元組，結構一致）。
   const _INFO_CARD_TOGGLES = [
     ['corrInfoToggleBtn',       'corrInfoBody',       'corrInfoIcon'],
     ['crossScopeToggleBtn',     'crossScopeBody',     'crossScopeIcon'],
+    ['crossMethodToggleBtn',    'crossMethodBody',    'crossMethodIcon'],
     ['warningInfoToggleBtn',    'warningInfoBody',    'warningInfoIcon'],
     ['timeAiInsightToggleBtn',  'timeAiInsightBody',  'timeAiInsightIcon'],
   ];
